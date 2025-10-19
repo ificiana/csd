@@ -12,5 +12,5 @@ def get_time():
 
 def time_tick():
     global SIM_TIME
-    SIM_TIME += 1
+    SIM_TIME += TIME_STEP
     return SIM_TIME

@@ -99,6 +99,17 @@ class Cube(Entity):
             self.ground_torque = np.zeros(3)
         print("z coords of bottom", self.bottom[:, 2], self.pos)
 
+    @property
+    def telemetry(self):
+        t = super().telemetry
+        t["pos"] = [*self.pos]  # type: ignore
+        t["rot"] = self.orientation.as_matrix().tolist()  # type: ignore
+        t["acc"] = [*self.acc]  # type: ignore
+        t["vel"] = [*self.vel]  # type: ignore
+        t["ang_acc"] = [*self.alpha]  # type: ignore
+        t["ang_vel"] = [*self.omega]  # type: ignore
+        return t
+
 
 drones = [Drone(e) for e in range(4)]
 ds_mass = sum(d.mass for d in drones)
@@ -127,11 +138,11 @@ def tick():
     payload.set_acc(forces)
     payload.tick()
 
-    input()
-
     for d in drones:
         d.transmit()
     payload.transmit()
+
+    input()
 
 
 while True:

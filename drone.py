@@ -9,3 +9,9 @@ class Drone(Entity):
     def __init__(self, index: int) -> None:
         super().__init__(f"drone_{index}")
         self.thrust = np.zeros(3)
+
+    @property
+    def telemetry(self):
+        t = super().telemetry
+        t["thrust"] = [*self.thrust]  # type: ignore
+        return t
