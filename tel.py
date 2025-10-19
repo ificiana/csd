@@ -1,7 +1,6 @@
 import json
 import mmap
 import os
-import warnings
 
 
 class MMapJSON:
@@ -44,8 +43,7 @@ class MMapJSON:
         self.size = new_size
         self.fp = open(self.path, "r+b")
         self.mmap = mmap.mmap(self.fp.fileno(), self.size)
-
-        warnings.warn(f"[MMapJSON] mmap size increased to {self.size} bytes")
+        print(f"[WARN] [MMapJSON] mmap size increased to {self.size} bytes")
 
     def write(self, data: dict | list):
         """Write a JSON snapshot to the mmap file."""
@@ -59,11 +57,15 @@ class MMapJSON:
             self._resize(new_size)
 
         # Clear old content
+        self.clear()
+        self.mmap.write(json_bytes)
+        self.mmap.flush()
+
+    def clear(self):
+        # Clear old content
         self.mmap.seek(0)
         self.mmap.write(b"\x00" * self.size)
         self.mmap.seek(0)
-        self.mmap.write(json_bytes)
-        self.mmap.flush()
 
     def read(self) -> dict | None:
         """Read the latest JSON snapshot from the mmap file."""

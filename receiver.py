@@ -2,6 +2,8 @@ import time
 
 from tel import MMapJSON
 
+DEL = True
+
 SENSOR_CHANNELS = [
     "cube",
     "drone_0",
@@ -12,6 +14,10 @@ SENSOR_CHANNELS = [
 
 DAT = MMapJSON(f"data/{int(time.time())}.mmap")
 sensors = {name: MMapJSON(f"channel/{name}.mmap") for name in SENSOR_CHANNELS}
+
+if DEL:
+    [s.clear() for s in sensors.values()]
+
 data = {
     **{
         f"drone_{k}": {

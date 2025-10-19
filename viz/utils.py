@@ -100,10 +100,19 @@ class Cube(BaseModel):
         return pd.DataFrame.from_dict(
             self.ang_vel, orient="index", columns=["Wx", "Wy", "Wz"]
         ).rename_axis("time")
+    
+    @property
+    def irl_time_df(self) -> pd.DataFrame:
+        df = pd.DataFrame.from_dict(
+            self.irl_time, orient="index", columns=["irl_time"]
+        ).rename_axis("time")
+        df["eff"] = df.index / df["irl_time"]
+        return df
 
     @property
     def df(self) -> pd.DataFrame:
         dfs = [
+            self.irl_time_df,
             self.pos_df,
             self.vel_df,
             self.acc_df,
@@ -192,7 +201,6 @@ def plot_time_series(
                 xaxis_title=cols[0],
                 yaxis_title=cols[1],
                 template="plotly_white",
-                width=800,
                 height=600,
             )
 
@@ -234,7 +242,6 @@ def plot_time_series(
             yaxis_title=ylabel or ", ".join(cols),
             hovermode="x unified",
             template="plotly_white",
-            width=800,
             height=400,
         )
     else:
@@ -299,3 +306,5 @@ def plot_graphs(data: Data):
         data.cube.df, ["Ax", "Ay", "Az"], title="Cube angular acceleration"
     )
     plot_time_series(data.cube.df, ["yaw", "pitch", "roll"], title="Yaw/Pitch/Roll")
+    plot_time_series(data.cube.df, "irl_time", title="IRL vs SIM")
+    plot_time_series(data.cube.df, "eff", title="IRL vs SIM eff")
