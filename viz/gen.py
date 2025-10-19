@@ -78,7 +78,7 @@ files = find_mmap_files("data", recursive=True)
 for f in files:
     tpl = tpl1 + f.name + tpl2
     ts = f.name.replace(".mmap", "")
-    
+
     if not Path(f"viz/{ts}.ipynb").exists():
         with open(f"viz/{ts}.ipynb", "w") as f:
             f.write(tpl)

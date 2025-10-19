@@ -100,7 +100,7 @@ class Cube(BaseModel):
         return pd.DataFrame.from_dict(
             self.ang_vel, orient="index", columns=["Wx", "Wy", "Wz"]
         ).rename_axis("time")
-    
+
     @property
     def irl_time_df(self) -> pd.DataFrame:
         df = pd.DataFrame.from_dict(

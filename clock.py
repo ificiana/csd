@@ -6,7 +6,7 @@ SIM_TIME = 0
 START_TIME = time.time_ns()
 
 # when to end the sim
-T = 30
+T = 10
 
 
 def get_time():

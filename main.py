@@ -146,13 +146,20 @@ def tick():
     # input()
 
 
-while True:
-    s = time.time_ns()
-    tick()
-    t = time.time_ns()
-    e = (t - s) / 1e9
-    time.sleep(max(0.0, TIME_STEP * SIM_SPEED - e))
+def main():
+    while True:
+        s = time.time_ns()
+        tick()
+        t = time.time_ns()
+        e = (t - s) / 1e9
+        time.sleep(max(0.0, TIME_STEP * SIM_SPEED - e))
 
-    # run for T seconds
-    if get_time() >= T:
-        exit()
+        # run for T seconds
+        if get_time() >= T:
+            return
+
+
+if __name__ == "__main__":
+    import cProfile
+
+    cProfile.run("main()", "prof")
