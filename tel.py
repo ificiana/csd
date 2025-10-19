@@ -1,13 +1,14 @@
 import json
 import mmap
 import os
+import warnings
 
 
 class MMapJSON:
     """
     A simple memory-mapped JSON file wrapper for fast telemetry.
+    Automatically expands if data exceeds current mmap size.
     Only stores the latest JSON snapshot.
-    Ground station can poll the file safely.
     """
 
     def __init__(self, path: str, size: int = 65536):
@@ -29,11 +30,33 @@ class MMapJSON:
         self.fp = open(self.path, "r+b")
         self.mmap = mmap.mmap(self.fp.fileno(), self.size)
 
-    def write(self, data: dict):
+    def _resize(self, new_size: int):
+        """Resize the mmap file safely."""
+        self.mmap.close()
+        self.fp.close()
+
+        # Expand the file
+        with open(self.path, "r+b") as f:
+            f.seek(new_size - 1)
+            f.write(b"\x00")
+
+        # Reopen and remap
+        self.size = new_size
+        self.fp = open(self.path, "r+b")
+        self.mmap = mmap.mmap(self.fp.fileno(), self.size)
+
+        warnings.warn(f"[MMapJSON] mmap size increased to {self.size} bytes")
+
+    def write(self, data: dict | list):
         """Write a JSON snapshot to the mmap file."""
         json_bytes = json.dumps(data).encode("utf-8")
+
+        # Auto-expand if too large
         if len(json_bytes) > self.size:
-            raise ValueError("JSON data exceeds mmap size")
+            new_size = self.size
+            while len(json_bytes) > new_size:
+                new_size *= 2
+            self._resize(new_size)
 
         # Clear old content
         self.mmap.seek(0)
