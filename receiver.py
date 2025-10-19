@@ -10,7 +10,7 @@ SENSOR_CHANNELS = [
     "drone_3",
 ]
 
-DAT = MMapJSON(f"data/{time.time()}.mmap")
+DAT = MMapJSON(f"data/{int(time.time())}.mmap")
 sensors = {name: MMapJSON(f"channel/{name}.mmap") for name in SENSOR_CHANNELS}
 data = {
     **{
@@ -40,7 +40,7 @@ while True:
             payload = reader.read()
             if payload:
                 t = payload["sim_time"]
-                for k,v in payload.items():
+                for k, v in payload.items():
                     if k == "sim_time":
                         continue
                     else:

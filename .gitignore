@@ -218,3 +218,4 @@ __marimo__/
 # sensor data
 channel/
 data/
+viz/*.ipynb

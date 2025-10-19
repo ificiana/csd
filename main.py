@@ -3,12 +3,12 @@ import time
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-from clock import SIM_SPEED, TIME_STEP, time_tick
+from clock import SIM_SPEED, TIME_STEP, T, get_time, time_tick
 from drone import Drone
 from entity import Entity
 from utils import cross, vec3
 
-G = vec3(0, 0, -9.81)
+G = vec3(0, 0, -9.80665)
 
 
 class Cube(Entity):
@@ -116,8 +116,8 @@ ds_mass = sum(d.mass for d in drones)
 payload = Cube(vec3(0, 0, 0))
 
 np.random.seed(0)
-# 0.01% of sqrt(3/4)*size
-err_att = np.random.normal(0, 0.00008660254037844386 * payload.size, (4, 3))
+# 0.01% of size
+err_att = np.random.normal(0, 0.0001 * payload.size, (4, 3))
 
 
 def tick():
@@ -152,3 +152,7 @@ while True:
     t = time.time_ns()
     e = (t - s) / 1e9
     time.sleep(max(0.0, TIME_STEP * SIM_SPEED - e))
+
+    # run for T seconds
+    if get_time() >= T:
+        exit()
