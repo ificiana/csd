@@ -36,7 +36,7 @@ tpl1 = r"""
    "outputs": [],
    "source": [
     "data = Data.model_validate(MMapJSON(\"../data/"""
-tpl2 = r"""\", 2**24).read())"
+tpl2 = r"""\", 2**24, file=True).read())"
    ]
   },
   {

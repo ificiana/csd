@@ -12,8 +12,8 @@ SENSOR_CHANNELS = [
     "drone_3",
 ]
 
-DAT = MMapJSON(f"data/{int(time.time())}.mmap")
-sensors = {name: MMapJSON(f"channel/{name}.mmap") for name in SENSOR_CHANNELS}
+DAT = MMapJSON(f"data/{int(time.time())}.mmap", file=True)
+sensors = {name: MMapJSON(f"channel/{name}") for name in SENSOR_CHANNELS}
 
 if DEL:
     [s.clear() for s in sensors.values()]

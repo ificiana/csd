@@ -7,8 +7,7 @@ from tel import MMapJSON
 class Entity:
     def __init__(self, topic: str) -> None:
         self.topic = topic
-        path = f"channel/{topic}.mmap"
-        self.transmitter = MMapJSON(path)
+        self.transmitter = MMapJSON(f"channel/{topic}")
 
     def transmit(self):
         self.transmitter.write(self.telemetry)
