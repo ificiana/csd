@@ -75,11 +75,11 @@ class Cube(Entity):
         self.vel += self.acc * TIME_STEP
         self.pos += self.vel * TIME_STEP
 
-        print("alpha", self.alpha)
-        print("accel", self.acc)
-        print("z coords of bottom", self.bottom[:, 2], self.pos)
+        # print("alpha", self.alpha)
+        # print("accel", self.acc)
+        # print("z coords of bottom", self.bottom[:, 2], self.pos)
         B = self.bottom[:, 2]
-        print("sink", B[B < 0])
+        # print("sink", B[B < 0])
 
         # Baumgarte?
         # find the index of min
@@ -97,7 +97,7 @@ class Cube(Entity):
         else:
             self.normal = np.zeros(3)
             self.ground_torque = np.zeros(3)
-        print("z coords of bottom", self.bottom[:, 2], self.pos)
+        # print("z coords of bottom", self.bottom[:, 2], self.pos)
 
     @property
     def telemetry(self):
@@ -123,13 +123,14 @@ err_att = np.random.normal(0, 0.00008660254037844386 * payload.size, (4, 3))
 def tick():
     time_tick()
 
-    print(payload.corners)
-    print(payload.bottom)
-    print("comps", payload.pos)
+    # print(payload.corners)
+    # print(payload.bottom)
+    # print("comps", payload.pos)
 
     torques = [payload.ground_torque]
     forces = [payload.normal]
     for r, d in zip(payload.corners + err_att, drones):
+        d.pos = r
         r -= payload.pos
         f = vec3(d.thrust + d.mass * G)
         forces.append(f)
@@ -142,7 +143,7 @@ def tick():
         d.transmit()
     payload.transmit()
 
-    input()
+    # input()
 
 
 while True:

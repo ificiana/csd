@@ -11,7 +11,7 @@ class MMapJSON:
     Only stores the latest JSON snapshot.
     """
 
-    def __init__(self, path: str, size: int = 65536):
+    def __init__(self, path: str, size: int = 4096):
         """
         Args:
             path: Path to the mmap file.
