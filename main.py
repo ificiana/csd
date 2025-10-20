@@ -26,8 +26,6 @@ class Cube(Entity):
         self.alpha = np.zeros(3)
         self.acc = np.zeros(3)
         self.vel = np.zeros(3)
-        self.normal = np.zeros(3)
-        self.ground_torque = np.zeros(3)
         
         np.random.seed(10)
         self.mass = self.mass + np.random.normal(0, self.mass * 0.0001)
@@ -66,42 +64,35 @@ class Cube(Entity):
     def set_acc(self, forces: list):
         self.acc = (sum(forces) + self.mass * G) / (self.mass + ds_mass)
 
-    def tick(self):
+    def _update(self, n):
         # ROTATION
-        # TODO: ground law, ground damping of acc
-        dR = R.from_rotvec(self.omega * TIME_STEP)
-        self.omega += self.alpha * TIME_STEP
+        dR = R.from_rotvec(self.omega * (TIME_STEP / n))
+        self.omega += self.alpha * (TIME_STEP / n)
         self.orientation *= dR
 
         # TRANSLATION
-        # TODO: ground law, ground damping of alpha
-        # note, pos is of the COM
-        self.vel += self.acc * TIME_STEP
-        self.pos += self.vel * TIME_STEP
-
-        # print("alpha", self.alpha)
-        # print("accel", self.acc)
-        # print("z coords of bottom", self.bottom[:, 2], self.pos)
-        B = self.bottom[:, 2]
-        # print("sink", B[B < 0])
-
-        # Baumgarte?
-        # find the index of min
-        # translate pos to make that 0
-        # apply max normal on minBx
-        minBx = np.argmin(B)
-        pen = B[minBx]
-        if pen < 0:
-            self.pos -= [0, 0, pen]
-            r = self.bottom[minBx] - self.pos
-            f = -G * (ds_mass + self.mass)
-            t = cross(vec3(*r), f)
-            self.normal = f
-            self.ground_torque = t
-        else:
-            self.normal = np.zeros(3)
-            self.ground_torque = np.zeros(3)
-        # print("z coords of bottom", self.bottom[:, 2], self.pos)
+        self.vel += self.acc * (TIME_STEP / n)
+        self.pos += self.vel * (TIME_STEP / n)
+    
+    def tick(self):
+        self._update(1)
+        pen = -float("inf")
+        
+        # GROUND LAW
+        k = 1
+        while pen < 0:
+            B = self.bottom[:, 2]
+            minBx = np.argmin(B)
+            x = B[minBx]
+            if x < 0:
+                self.pos -= [0, 0, x]
+                self.alpha /= 2
+                self.acc = np.zeros(3)
+                self.vel = np.zeros(3)
+                self.omega = np.zeros(3)
+                self._update(1 / k)
+                k *= 2
+            pen = x
 
     @property
     def telemetry(self):
@@ -133,8 +124,8 @@ def tick():
     # print(payload.bottom)
     # print("comps", payload.pos)
 
-    torques = [payload.ground_torque]
-    forces = [payload.normal]
+    torques = []
+    forces = []
     for r, d in zip(payload.corners + err_att, drones):
         d.pos = r.copy()
         r -= payload.pos
