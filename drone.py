@@ -10,6 +10,9 @@ class Drone(Entity):
         super().__init__(f"drone_{index}")
         self.thrust = np.zeros(3)
         self.pos = np.zeros(3)
+        
+        np.random.seed(1 + index)
+        self.mass = self.mass + np.random.normal(0, self.mass * 0.0001)
 
     @property
     def telemetry(self):

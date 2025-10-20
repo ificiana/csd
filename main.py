@@ -1,9 +1,10 @@
+# from pprint import pprint
 import time
 
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-from clock import SIM_SPEED, TIME_STEP, T, get_time, time_tick
+from clock import TIME_STEP, T, get_time, time_tick
 from drone import Drone
 from entity import Entity
 from utils import cross, vec3
@@ -27,6 +28,9 @@ class Cube(Entity):
         self.vel = np.zeros(3)
         self.normal = np.zeros(3)
         self.ground_torque = np.zeros(3)
+        
+        np.random.seed(10)
+        self.mass = self.mass + np.random.normal(0, self.mass * 0.0001)
 
     @property
     def corners(self):
@@ -65,8 +69,8 @@ class Cube(Entity):
     def tick(self):
         # ROTATION
         # TODO: ground law, ground damping of acc
-        self.omega += self.alpha * TIME_STEP
         dR = R.from_rotvec(self.omega * TIME_STEP)
+        self.omega += self.alpha * TIME_STEP
         self.orientation *= dR
 
         # TRANSLATION
@@ -112,8 +116,10 @@ class Cube(Entity):
 
 
 drones = [Drone(e) for e in range(4)]
+print(*[f"{d.topic}:{d.mass}" for d in drones])
 ds_mass = sum(d.mass for d in drones)
-payload = Cube(vec3(0, 0, 0))
+payload = Cube(vec3(10, 10, 150))
+print(payload.mass)
 
 np.random.seed(0)
 # 0.01% of size
@@ -130,7 +136,7 @@ def tick():
     torques = [payload.ground_torque]
     forces = [payload.normal]
     for r, d in zip(payload.corners + err_att, drones):
-        d.pos = r
+        d.pos = r.copy()
         r -= payload.pos
         f = vec3(d.thrust + d.mass * G)
         forces.append(f)
@@ -141,7 +147,9 @@ def tick():
 
     for d in drones:
         d.transmit()
+        # pprint(d.telemetry)
     payload.transmit()
+    # pprint(payload.telemetry)
 
     # input()
 
@@ -151,8 +159,8 @@ def main():
         s = time.time_ns()
         tick()
         t = time.time_ns()
-        e = (t - s) / 1e9
-        time.sleep(max(0.0, TIME_STEP * SIM_SPEED - e))
+        e = (t - s) / 1e9 / 0.7
+        time.sleep(max(0.0, TIME_STEP - e))
 
         # run for T seconds
         if get_time() >= T:
