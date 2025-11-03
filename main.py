@@ -5,6 +5,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 from clock import TIME_STEP, T, get_time, time_tick
+from controller import ThrustController
 from drone import Drone
 from entity import Entity
 from utils import cross, vec3
@@ -26,9 +27,6 @@ class Cube(Entity):
         self.alpha = np.zeros(3)
         self.acc = np.zeros(3)
         self.vel = np.zeros(3)
-        
-        np.random.seed(10)
-        self.mass = self.mass + np.random.normal(0, self.mass * 0.0001)
 
     @property
     def corners(self):
@@ -64,35 +62,30 @@ class Cube(Entity):
     def set_acc(self, forces: list):
         self.acc = (sum(forces) + self.mass * G) / (self.mass + ds_mass)
 
-    def _update(self, n):
+    def update(self):
         # ROTATION
-        dR = R.from_rotvec(self.omega * (TIME_STEP / n))
-        self.omega += self.alpha * (TIME_STEP / n)
+        dR = R.from_rotvec(self.omega * TIME_STEP)
+        self.omega += self.alpha * TIME_STEP
         self.orientation *= dR
 
         # TRANSLATION
-        self.vel += self.acc * (TIME_STEP / n)
-        self.pos += self.vel * (TIME_STEP / n)
-    
+        self.vel += self.acc * TIME_STEP
+        self.pos += self.vel * TIME_STEP
+
     def tick(self):
-        self._update(1)
-        pen = -float("inf")
-        
+        self.update()
+
         # GROUND LAW
-        k = 1
-        while pen < 0:
-            B = self.bottom[:, 2]
-            minBx = np.argmin(B)
-            x = B[minBx]
-            if x < 0:
-                self.pos -= [0, 0, x]
-                self.alpha /= 2
-                self.acc = np.zeros(3)
-                self.vel = np.zeros(3)
-                self.omega = np.zeros(3)
-                self._update(1 / k)
-                k *= 2
-            pen = x
+        B = self.bottom[:, 2]
+        minBx = np.argmin(B)
+        pen = B[minBx]
+        if pen < 0:
+            self.pos -= [0, 0, pen]
+            self.alpha = np.zeros(3)
+            self.acc = np.zeros(3)
+            self.vel = np.zeros(3)
+            self.omega = np.zeros(3)
+            self.update()
 
     @property
     def telemetry(self):
@@ -109,16 +102,18 @@ class Cube(Entity):
 drones = [Drone(e) for e in range(4)]
 print(*[f"{d.topic}:{d.mass}" for d in drones])
 ds_mass = sum(d.mass for d in drones)
-payload = Cube(vec3(10, 10, 150))
+payload = Cube(vec3(10, 10, 0))
 print(payload.mass)
 
 np.random.seed(0)
 # 0.01% of size
 err_att = np.random.normal(0, 0.0001 * payload.size, (4, 3))
+controller = ThrustController(payload=payload, drones=drones)
 
 
 def tick():
     time_tick()
+    controller.update()
 
     # print(payload.corners)
     # print(payload.bottom)

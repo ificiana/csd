@@ -8,6 +8,7 @@ from scipy.spatial.transform import Rotation as R
 class Drone(BaseModel):
     irl_time: dict[float, float]
     pos: dict[float, tuple[float, float, float]]
+    command: dict[float, tuple[float, float, float]]
     thrust: dict[float, tuple[float, float, float]]
 
     @property
@@ -24,9 +25,13 @@ class Drone(BaseModel):
 
     @property
     def thrust_df(self) -> pd.DataFrame:
-        return pd.DataFrame.from_dict(
+        t = pd.DataFrame.from_dict(
             self.thrust, orient="index", columns=["tx", "ty", "tz"]
         ).rename_axis("time")
+        c = pd.DataFrame.from_dict(
+            self.command, orient="index", columns=["cx", "cy", "cz"]
+        ).rename_axis("time")
+        return pd.concat([t, c], axis=1)
 
     @property
     def df(self) -> pd.DataFrame:
@@ -283,18 +288,20 @@ def plot_graphs(data: Data):
     plot_time_series(
         data.drone_0.df, ["x", "y", "z"], title="Drone 0 Position", traj=True
     )
-    plot_time_series(data.drone_1.df, ["x", "y", "z"], title="Drone 1 Position")
-    plot_time_series(
-        data.drone_1.df, ["x", "y", "z"], title="Drone 1 Position", traj=True
-    )
-    plot_time_series(data.drone_2.df, ["x", "y", "z"], title="Drone 2 Position")
-    plot_time_series(
-        data.drone_2.df, ["x", "y", "z"], title="Drone 2 Position", traj=True
-    )
-    plot_time_series(data.drone_3.df, ["x", "y", "z"], title="Drone 3 Position")
-    plot_time_series(
-        data.drone_3.df, ["x", "y", "z"], title="Drone 3 Position", traj=True
-    )
+    plot_time_series(data.drone_0.df, ["cx", "cy", "cz"], title="Drone 0 Command")
+    plot_time_series(data.drone_0.df, ["tx", "ty", "tz"], title="Drone 0 Thrust")
+    # plot_time_series(data.drone_1.df, ["x", "y", "z"], title="Drone 1 Position")
+    # plot_time_series(
+    #     data.drone_1.df, ["x", "y", "z"], title="Drone 1 Position", traj=True
+    # )
+    # plot_time_series(data.drone_2.df, ["x", "y", "z"], title="Drone 2 Position")
+    # plot_time_series(
+    #     data.drone_2.df, ["x", "y", "z"], title="Drone 2 Position", traj=True
+    # )
+    # plot_time_series(data.drone_3.df, ["x", "y", "z"], title="Drone 3 Position")
+    # plot_time_series(
+    #     data.drone_3.df, ["x", "y", "z"], title="Drone 3 Position", traj=True
+    # )
     plot_time_series(data.cube.df, ["x", "y", "z"], title="Cube COM position")
     plot_time_series(
         data.cube.df, ["x", "y", "z"], title="Cube COM position", traj=True
@@ -306,5 +313,5 @@ def plot_graphs(data: Data):
         data.cube.df, ["Ax", "Ay", "Az"], title="Cube angular acceleration"
     )
     plot_time_series(data.cube.df, ["yaw", "pitch", "roll"], title="Yaw/Pitch/Roll")
-    plot_time_series(data.cube.df, "irl_time", title="IRL vs SIM")
-    plot_time_series(data.cube.df, "eff", title="IRL vs SIM eff")
+    # plot_time_series(data.cube.df, "irl_time", title="IRL vs SIM")
+    # plot_time_series(data.cube.df, "eff", title="IRL vs SIM eff")

@@ -23,6 +23,7 @@ data = {
         f"drone_{k}": {
             "irl_time": {},
             "thrust": {},
+            "command": {},
             "pos": {},
         }
         for k in range(4)
