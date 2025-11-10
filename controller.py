@@ -10,8 +10,6 @@ if TYPE_CHECKING:
 
 
 HEIGHT = 5
-# max speed (m/s)
-BETA = 1
 
 
 class ThrustController:
@@ -20,17 +18,23 @@ class ThrustController:
         self.payload = payload
         self.g = -9.80665
         self.mass = self.payload.mass + sum([d.mass for d in self.drones])
-        self.neq = -self.mass * self.g
-        self.cur = lambda: np.sum([d.thrust[2] for d in drones])
+        
+        # max takeoff = 75% of max thrust
+        self.max_takeoff = 0.75 * drones[0].max_thrust * 4
+        self.max_takeoff_acc = self.max_takeoff / self.mass + self.g
+        # z coeff for takeoff profile
+        self.z_coeff = np.sqrt(3 * HEIGHT * self.max_takeoff_acc / (10 * np.sqrt(3)))
+        
+        print(self.max_takeoff, self.max_takeoff_acc, self.z_coeff)
 
     def update(self):
         t = get_time()
         
         # take off stage
-        if self.payload.pos[2] < HEIGHT + 0.5:
-            A = 60 * BETA ** 3 / HEIGHT ** 2
-            B = -180 * BETA ** 4 / HEIGHT ** 3
-            C = 120 * BETA ** 5 / HEIGHT ** 4
+        if self.payload.pos[2] < HEIGHT + self.payload.h:
+            A = 60 * self.z_coeff ** 3 / HEIGHT ** 2
+            B = -180 * self.z_coeff ** 4 / HEIGHT ** 3
+            C = 120 * self.z_coeff ** 5 / HEIGHT ** 4
             X = A*t**1 + B*t**2 + C*t**3
             a = X - self.g
         else:
