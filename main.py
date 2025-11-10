@@ -102,7 +102,7 @@ class Cube(Entity):
 drones = [Drone(e) for e in range(4)]
 print(*[f"{d.topic}:{d.mass}" for d in drones])
 ds_mass = sum(d.mass for d in drones)
-payload = Cube(vec3(10, 10, 0))
+payload = Cube(vec3(0, 0, 0))
 print(payload.mass)
 
 np.random.seed(0)
