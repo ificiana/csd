@@ -32,6 +32,8 @@ class Drone(Entity):
         e = self.t_c - self.thrust
         self.thrust += e * dt
 
+        self.thrust += np.random.normal(0, 0.01, 3)  # add small noise
+
         # enforce maximum magnitude limit
         mag = np.linalg.norm(self.thrust)
         if mag > self.max_thrust:

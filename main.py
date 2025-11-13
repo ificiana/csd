@@ -64,8 +64,8 @@ class Cube(Entity):
 
     def update(self):
         # ROTATION
-        dR = R.from_rotvec(self.omega * TIME_STEP)
         self.omega += self.alpha * TIME_STEP
+        dR = R.from_rotvec(self.omega * TIME_STEP)
         self.orientation *= dR
 
         # TRANSLATION
