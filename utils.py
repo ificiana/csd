@@ -1,19 +1,32 @@
+"""
+Mathematical utilities for rigid body dynamics and geometric control.
+
+Theory:
+    The vee operator (v: so(3) -> R^3) is the inverse of the hat operator,
+    mapping skew-symmetric matrices back to their vector representation.
+    
+    For a skew-symmetric matrix S in so(3) (Lie algebra of SO(3)):
+        S = [  0  -c   b ]
+            [  c   0  -a ]
+            [ -b   a   0 ]
+    
+    The vee operator extracts the vector:
+        vee(S) = [a, b, c]^T
+    
+    This is used in geometric attitude control to extract rotation error
+    from the matrix expression:
+        e_R = vee(R_d^T R - R^T R_d) / 2
+    
+    where R is current orientation and R_d is desired orientation.
+"""
+
 import numpy as np
-from pyglm import glm
-
-vec1 = glm.vec1
-vec2 = glm.vec2
-vec3 = glm.vec3
-vec4 = glm.vec4
-
-cross = glm.cross
 
 
-def vee(S):
+def vee(skew_symmetric_matrix):
     """
-    Vee operator for SO(3): extracts the vector from a skew-symmetric matrix.
-    Used in geometric attitude control (Lee 2010).
-
-    For a skew-symmetric matrix S, returns [S[2,1], S[0,2], S[1,0]].
+    Extracts vector from skew-symmetric matrix (vee operator).
+    
+    Returns [S[2,1], S[0,2], S[1,0]] for skew-symmetric matrix S.
     """
-    return np.array([S[2, 1], S[0, 2], S[1, 0]])
+    return np.array([skew_symmetric_matrix[2, 1], skew_symmetric_matrix[0, 2], skew_symmetric_matrix[1, 0]])

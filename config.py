@@ -1,5 +1,9 @@
 """
-Configuration constants for the drone-payload simulation
+Configuration constants for the drone-payload simulation.
+
+This module centralizes all simulation parameters including physics constants,
+controller gains, noise parameters, and feature toggles for the quadcopter
+cooperative payload transport system.
 """
 
 import numpy as np
