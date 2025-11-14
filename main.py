@@ -11,6 +11,7 @@ from config import (
     ATTACHMENT_POINTS,
     CUBE_MASS,
     CUBE_SIZE,
+    ENABLE_PROFILING,
     G_ACCELERATION,
     SIM_DURATION,
     TIME_SCALE_FACTOR,
@@ -163,6 +164,8 @@ def main():
 
 
 if __name__ == "__main__":
-    import cProfile
-
-    cProfile.run("main()", "prof")
+    if ENABLE_PROFILING:
+        import cProfile
+        cProfile.run("main()", "prof")
+    else:
+        main()

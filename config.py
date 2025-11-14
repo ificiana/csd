@@ -5,10 +5,28 @@ Configuration constants for the drone-payload simulation
 import numpy as np
 
 # ============================================================================
+# FEATURE SWITCHES
+# ============================================================================
+# Enable/disable various simulation features for testing and debugging
+
+# Noise switches
+ENABLE_DRONE_MASS_VARIANCE = True  # Add random variance to drone masses
+ENABLE_DRONE_THRUST_NOISE = True  # Add noise to drone thrust outputs
+ENABLE_ATTACHMENT_ERROR = True  # Add error to attachment point positions
+
+# Controller switches
+ENABLE_ATTITUDE_CONTROLLER = True  # Enable geometric attitude control
+ENABLE_POSITION_CONTROLLER = True  # Enable PID position control
+
+# Profiling
+ENABLE_PROFILING = True  # Enable cProfile performance profiling
+
+# ============================================================================
 # SIMULATION TIMING
 # ============================================================================
 TIME_STEP = 0.001  # Simulation time step in seconds
 SIM_DURATION = 30  # Total simulation duration in seconds
+T = SIM_DURATION  # Alias for backward compatibility
 
 # ============================================================================
 # SIMULATION PERFORMANCE
@@ -27,19 +45,28 @@ CUBE_MASS = 10  # kg
 CUBE_SIZE = 1  # meters
 
 # ============================================================================
-# DRONE PARAMETERS
+# DRONE PARAMETERS (base values)
 # ============================================================================
 DRONE_MASS = 1  # kg (base mass, subject to random variation)
 DRONE_MAX_THRUST = 50  # N
-DRONE_MASS_VARIANCE = 0.0001  # Mass variation coefficient
-DRONE_THRUST_NOISE = 0.01  # 1% thrust magnitude noise
 DRONE_TIME_CONSTANT = 0.2  # Motor response time constant (seconds)
+
+# Noise parameters
+DRONE_MASS_VARIANCE_AMOUNT = 0.0001  # Mass variation coefficient
+DRONE_THRUST_NOISE_AMOUNT = 0.01  # 1% thrust magnitude noise
+
+# Conditional noise values (set to 0 if disabled)
+DRONE_MASS_VARIANCE = DRONE_MASS_VARIANCE_AMOUNT if ENABLE_DRONE_MASS_VARIANCE else 0.0
+DRONE_THRUST_NOISE = DRONE_THRUST_NOISE_AMOUNT if ENABLE_DRONE_THRUST_NOISE else 0.0
 
 # ============================================================================
 # ATTACHMENT ERROR
 # ============================================================================
 ATTACHMENT_ERROR_SEED = 0  # Random seed for attachment position error
-ATTACHMENT_ERROR_SCALE = 0.0001  # Error scale relative to payload size
+ATTACHMENT_ERROR_SCALE_AMOUNT = 0.0001  # Error scale relative to payload size
+
+# Conditional attachment error (set to 0 if disabled)
+ATTACHMENT_ERROR_SCALE = ATTACHMENT_ERROR_SCALE_AMOUNT if ENABLE_ATTACHMENT_ERROR else 0.0
 
 # ============================================================================
 # TRAJECTORY WAYPOINTS
@@ -57,8 +84,8 @@ HOVER_TIMES = [2.0, 2.0, 10.0]  # Hover durations at each waypoint (seconds)
 # CONTROLLER GAINS
 # ============================================================================
 # Attitude control gains (Lee 2010 geometric controller)
-KR = 100.0  # Attitude error gain
-KW = 100.0  # Angular velocity error gain
+KR_AMOUNT = 100.0  # Attitude error gain
+KW_AMOUNT = 100.0  # Angular velocity error gain
 
 # Position controller gains (Ziegler-Nichols tuned)
 KU_XY = 4  # Ultimate gain for X/Y axes
@@ -66,10 +93,17 @@ TU_XY = 3.14  # Ultimate period for X/Y axes
 KU_Z = 6  # Ultimate gain for Z axis
 TU_Z = 2.56  # Ultimate period for Z axis
 
-# PID gains (computed from Ziegler-Nichols parameters)
-KP = np.diag([0.8 * KU_XY, 0.8 * KU_XY, 0.8 * KU_Z])
-KI_POS = np.diag([0 * KU_XY / TU_XY, 0 * KU_XY / TU_XY, 0 * KU_Z / TU_Z])
-KD = np.diag([0.1 * KU_XY * TU_XY, 0.1 * KU_XY * TU_XY, 0.1 * KU_Z * TU_Z])
+# PID gain amounts (computed from Ziegler-Nichols parameters)
+KP_AMOUNT = np.diag([0.8 * KU_XY, 0.8 * KU_XY, 0.8 * KU_Z])
+KI_POS_AMOUNT = np.diag([0 * KU_XY / TU_XY, 0 * KU_XY / TU_XY, 0 * KU_Z / TU_Z])
+KD_AMOUNT = np.diag([0.1 * KU_XY * TU_XY, 0.1 * KU_XY * TU_XY, 0.1 * KU_Z * TU_Z])
+
+# Conditional controller gains (set to 0 if disabled)
+KR = KR_AMOUNT if ENABLE_ATTITUDE_CONTROLLER else 0.0
+KW = KW_AMOUNT if ENABLE_ATTITUDE_CONTROLLER else 0.0
+KP = KP_AMOUNT if ENABLE_POSITION_CONTROLLER else np.zeros((3, 3))
+KI_POS = KI_POS_AMOUNT if ENABLE_POSITION_CONTROLLER else np.zeros((3, 3))
+KD = KD_AMOUNT if ENABLE_POSITION_CONTROLLER else np.zeros((3, 3))
 
 # ============================================================================
 # THRUST ALLOCATION
