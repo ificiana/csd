@@ -26,8 +26,25 @@ Theory:
     in scipy.spatial.transform.Rotation.from_rotvec).
 
     MOMENT OF INERTIA:
-        For a uniform cube with mass m and side length a:
-        I = (m * a^2 / 6) * eye(3)
+        For a uniform cube with mass m_c and side length a:
+            I_cube = (m_c * a^2 / 6) * I_3
+        
+        For 4 point mass drones at attachment points r_i = (±a/2, ±a/2, a/2):
+            I_drones = sum_i m_i * (||r_i||^2 * I_3 - r_i ⊗ r_i)
+        
+        For symmetric configuration with total drone mass m_d:
+            ||r_i||^2 = (a/2)^2 + (a/2)^2 + (a/2)^2 = 3a^2/4
+            
+            Each drone contributes to diagonal:
+                I_xx = m_i * (y_i^2 + z_i^2) = m_i * (a^2/4 + a^2/4) = m_i * a^2/2
+                I_yy = m_i * (x_i^2 + z_i^2) = m_i * (a^2/4 + a^2/4) = m_i * a^2/2
+                I_zz = m_i * (x_i^2 + y_i^2) = m_i * (a^2/4 + a^2/4) = m_i * a^2/2
+            
+            Summing over 4 drones: I_drones = (m_d/2 * a^2) * I_3
+        
+        Combined system:
+            I_total = I_cube + I_drones
+                    = (m_c/6 + m_d/2) * a^2 * I_3
 
     GROUND CONTACT:
         Simple penetration-based contact: if any bottom corner has z < 0,

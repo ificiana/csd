@@ -90,11 +90,13 @@ The control of cooperative payload transport presents several challenges:
 \subsection{Contributions}
 This work makes the following contributions:
 \begin{enumerate}
-    \item A complete 6-DOF rigid body simulation framework implementing Newton-Euler dynamics with Rodrigues integration for rotational motion
-    \item Hierarchical control architecture combining geometric attitude control with PID position regulation
-    \item Quintic polynomial trajectory generation ensuring C$^2$ continuity with zero endpoint velocities
-    \item Realistic noise modeling including drone mass variance, actuator noise, and geometric uncertainties
-    \item Comprehensive simulation environment with configurable parameters and real-time telemetry
+    \item A complete 6-DOF rigid body simulation framework implementing Newton-Euler dynamics with Rodrigues integration for rotational motion and point mass drone modeling
+    \item Hierarchical control architecture combining geometric attitude control on SO(3) with PID position regulation
+    \item Multi-phase trajectory planning (7 phases: takeoff, hover, translate, hover, translate, hover, landing) using quintic polynomial profiles ensuring C$^2$ continuity
+    \item Realistic DJI Matrice 300 RTK-based drone modeling with accurate mass and thrust specifications
+    \item Realistic noise modeling including 2\% mass variance, 5\% thrust noise, and 1\% attachment point geometric uncertainties
+    \item Comprehensive simulation environment with configurable parameters and JSON-based real-time telemetry via memory-mapped files
+    \item Live telemetry display with oscillation tracking for all 6 DOF
 \end{enumerate}
 
 \subsection{Organization}
@@ -217,6 +219,14 @@ where $m_d = \sum_{i=0}^{3} m_i^{\text{drone}}$ is total drone mass.
 
 \subsection{Drone Actuator Model}
 
+\subsubsection{DJI Matrice 300 RTK Specifications}
+The simulation uses realistic drone parameters based on the DJI Matrice 300 RTK:
+\begin{itemize}
+    \item Base mass: $m_d = \SI{6.3}{kg}$
+    \item Maximum thrust per drone: $T_{\max} = \frac{9g}{0.7} \approx \SI{126}{N}$ (90\% of hover at 70\% throttle)
+    \item Total system capacity: 4 drones with combined thrust $\SI{504}{N}$ supporting \SI{35.2}{kg} system
+\end{itemize}
+
 \subsubsection{First-Order Thrust Dynamics}
 Real quadrotor motors exhibit lag due to rotor inertia. We model this as a first-order system:
 \begin{equation}
@@ -232,7 +242,7 @@ Discretizing with forward Euler:
 \end{equation}
 
 \subsubsection{Thrust Saturation}
-Each drone has maximum thrust $T_{\max} = \SI{250}{N}$. The thrust vector is saturated:
+Each drone has maximum thrust $T_{\max} = \SI{126}{N}$. The thrust vector is saturated:
 \begin{equation}
     \mathbf{T}_i \leftarrow \begin{cases}
         \mathbf{T}_i & \text{if } \|\mathbf{T}_i\| \leq T_{\max} \\
@@ -246,14 +256,14 @@ Each drone has maximum thrust $T_{\max} = \SI{250}{N}$. The thrust vector is sat
 \subsubsection{Drone Mass Variance}
 Each drone mass is perturbed:
 \begin{equation}
-    m_i = m_{\text{nominal}} + \mathcal{N}(0, \sigma_m^2), \quad \sigma_m = 0.0001 \cdot m_{\text{nominal}}
+    m_i = m_{\text{nominal}} + \mathcal{N}(0, \sigma_m^2), \quad \sigma_m = 0.02 \cdot m_{\text{nominal}}
     \label{eq:mass_variance}
 \end{equation}
 
 \subsubsection{Thrust Noise}
 Thrust vectors are corrupted by Gaussian noise:
 \begin{equation}
-    \mathbf{T}_i \leftarrow \mathbf{T}_i + \mathcal{N}(\mathbf{0}, \sigma_T^2\mathbf{I}_3), \quad \sigma_T = 0.01 \|\mathbf{T}_i\|
+    \mathbf{T}_i \leftarrow \mathbf{T}_i + \mathcal{N}(\mathbf{0}, \sigma_T^2\mathbf{I}_3), \quad \sigma_T = 0.05 \|\mathbf{T}_i\|
     \label{eq:thrust_noise}
 \end{equation}
 
@@ -263,7 +273,7 @@ Attachment positions include fabrication errors:
     \mathbf{r}_i^{\text{actual}} = \mathbf{r}_i^{\text{nominal}} + \boldsymbol{\epsilon}_i, \quad \boldsymbol{\epsilon}_i \sim \mathcal{N}(\mathbf{0}, \sigma_a^2\mathbf{I}_3)
     \label{eq:attachment_error}
 \end{equation}
-with $\sigma_a = 0.0001 \cdot a$.
+with $\sigma_a = 0.01 \cdot a$.
 
 \subsection{Ground Contact Model}
 
@@ -352,13 +362,13 @@ where:
 Gains are computed using Ziegler-Nichols tuning:
 \begin{itemize}
     \item Ultimate gains: $K_{u,xy} = 0.08 T_{\max}$, $K_{u,z} = 0.12 T_{\max}$
-    \item Ultimate periods: $T_{u,xy} = \SI{3.14}{s}$, $T_{u,z} = \SI{2.56}{s}$
+    \item Ultimate periods: $T_{u} = \SI{3.5}{s}$ (both axes)
 \end{itemize}
 
 PD control gains:
 \begin{align}
     \mathbf{K}_p &= \text{diag}(0.8 K_{u,xy}, 0.8 K_{u,xy}, 0.8 K_{u,z}) \\
-    \mathbf{K}_d &= \text{diag}(0.1 K_{u,xy}T_{u,xy}, 0.1 K_{u,xy}T_{u,xy}, 0.1 K_{u,z}T_{u,z})
+    \mathbf{K}_d &= \text{diag}(0.1 K_{u,xy}T_{u}, 0.1 K_{u,xy}T_{u}, 0.1 K_{u,z}T_{u})
 \end{align}
 
 Integral action is disabled ($\mathbf{K}_i = \mathbf{0}$) to avoid wind-up issues.
@@ -376,9 +386,9 @@ where $\mathbf{F}_{\text{ff}} = m\mathbf{a}_d$ is feedforward from trajectory.
 \subsubsection{Control Authority Limits}
 Available thrust is partitioned:
 \begin{align}
-    F_{\text{takeoff}} &= 0.75 \cdot 4T_{\max} = \SI{750}{N} \\
-    F_{\text{transl}} &= 0.33 \cdot (4T_{\max} - F_{\text{takeoff}}) = \SI{82.5}{N} \\
-    F_{\text{control}} &= 4T_{\max} - F_{\text{takeoff}} - F_{\text{transl}} = \SI{167.5}{N}
+    F_{\text{takeoff}} &= 0.75 \cdot 4T_{\max} = \SI{378}{N} \\
+    F_{\text{transl}} &= 0.33 \cdot (4T_{\max} - F_{\text{takeoff}}) = \SI{41.58}{N} \\
+    F_{\text{control}} &= 4T_{\max} - F_{\text{takeoff}} - F_{\text{transl}} = \SI{84.42}{N}
 \end{align}
 
 Control forces are saturated:
@@ -862,21 +872,32 @@ Solving this system yields:
     a_5 &= 6dT^{-5}
 \end{align}
 
-\subsection{Moment of Inertia for Uniform Cube}
+\subsection{Moment of Inertia for Cube with Point Mass Drones}
 
-For a uniform cube with density $\rho$, side length $a$, and mass $m = \rho a^3$:
+For a uniform cube with density $\rho$, side length $a$, and mass $m_c = \rho a^3$:
 \begin{equation}
     I_{xx} = \int\int\int (y^2 + z^2) \rho \, dx\,dy\,dz
 \end{equation}
 
 By symmetry, $I_{xx} = I_{yy} = I_{zz}$ and off-diagonal terms vanish. Evaluating:
 \begin{equation}
-    I_{xx} = \rho \int_{-a/2}^{a/2} \int_{-a/2}^{a/2} \int_{-a/2}^{a/2} (y^2 + z^2) \, dx\,dy\,dz = \frac{ma^2}{6}
+    I_{xx} = \rho \int_{-a/2}^{a/2} \int_{-a/2}^{a/2} \int_{-a/2}^{a/2} (y^2 + z^2) \, dx\,dy\,dz = \frac{m_c a^2}{6}
 \end{equation}
 
-Therefore:
+For 4 point mass drones at attachment points $\mathbf{r}_i = (\pm a/2, \pm a/2, a/2)$ with total mass $m_d$:
 \begin{equation}
-    \mathbf{I} = \frac{ma^2}{6} \begin{bmatrix} 1 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix}
+    \mathbf{I}_{\text{drones}} = \sum_{i=1}^{4} m_i \left( \|\mathbf{r}_i\|^2 \mathbf{I}_3 - \mathbf{r}_i \otimes \mathbf{r}_i \right)
+\end{equation}
+
+Each drone contributes to the diagonal:
+\begin{align}
+    I_{xx}^{(i)} &= m_i(y_i^2 + z_i^2) = m_i(a^2/4 + a^2/4) = \frac{m_i a^2}{2} \\
+    I_{yy}^{(i)} &= m_i(x_i^2 + z_i^2) = \frac{m_i a^2}{2}, \quad I_{zz}^{(i)} = m_i(x_i^2 + y_i^2) = \frac{m_i a^2}{2}
+\end{align}
+
+Summing over 4 drones: $\mathbf{I}_{\text{drones}} = \frac{m_d a^2}{2} \mathbf{I}_3$. The combined system MOI is:
+\begin{equation}
+    \mathbf{I}_{\text{total}} = \mathbf{I}_{\text{cube}} + \mathbf{I}_{\text{drones}} = \left(\frac{m_c}{6} + \frac{m_d}{2}\right) a^2 \mathbf{I}_3
 \end{equation}
 
 \section{Implementation Details}
@@ -916,23 +937,32 @@ This is implemented in \texttt{scipy.spatial.transform.Rotation.from\_rotvec()}.
 \toprule
 Parameter & Symbol & Value \\
 \midrule
-Time step & $\Delta t$ & \SI{0.001}{s} \\
-Simulation duration & $T_{\text{sim}}$ & \SI{30}{s} \\
+Time step & $\Delta t$ & \SI{0.01}{s} \\
+Simulation duration & $T_{\text{sim}}$ & \SI{45}{s} \\
+Time scale factor & -- & $0.7$ \\
 Payload mass & $m_c$ & \SI{10}{kg} \\
-Payload size & $a$ & \SI{1}{m} \\
-Drone mass & $m_d$ & \SI{1}{kg} \\
-Drone max thrust & $T_{\max}$ & \SI{250}{N} \\
+Payload size & $a$ & \SI{0.25}{m} \\
+Drone mass (each) & $m_d$ & \SI{6.3}{kg} \\
+Total drone mass & -- & \SI{25.2}{kg} \\
+Drone max thrust & $T_{\max}$ & \SI{126}{N} \\
 Motor time constant & $\tau_m$ & \SI{0.2}{s} \\
 Gravity & $g$ & \SI{9.80665}{m/s^2} \\
 Attitude gain & $K_R$ & $4T_{\max}$ \\
 Angular velocity gain & $K_\omega$ & $4T_{\max}$ \\
-Position gain (xy) & $K_{p,xy}$ & $0.8 \times 0.08 T_{\max}$ \\
-Position gain (z) & $K_{p,z}$ & $0.8 \times 0.12 T_{\max}$ \\
-Derivative gain (xy) & $K_{d,xy}$ & $0.1 \times 0.08 T_{\max} \times 3.14$ \\
-Derivative gain (z) & $K_{d,z}$ & $0.1 \times 0.12 T_{\max} \times 2.56$ \\
-Mass variance & $\sigma_m$ & $0.0001 m_d$ \\
-Thrust noise & $\sigma_T$ & $0.01 \|T\|$ \\
-Attachment error & $\sigma_a$ & $0.0001 a$ \\
+Ultimate gain (xy) & $K_{u,xy}$ & $0.08 T_{\max}$ \\
+Ultimate gain (z) & $K_{u,z}$ & $0.12 T_{\max}$ \\
+Ultimate period & $T_u$ & \SI{3.5}{s} \\
+Position gain (xy) & $K_{p,xy}$ & $0.8 K_{u,xy}$ \\
+Position gain (z) & $K_{p,z}$ & $0.8 K_{u,z}$ \\
+Integral gain & $K_{i}$ & $0$ \\
+Derivative gain (xy) & $K_{d,xy}$ & $0.1 K_{u,xy} T_u$ \\
+Derivative gain (z) & $K_{d,z}$ & $0.1 K_{u,z} T_u$ \\
+Mass variance & $\sigma_m$ & $0.02 m_d$ (2\%) \\
+Thrust noise & $\sigma_T$ & $0.05 \|\mathbf{T}\|$ (5\%) \\
+Attachment error & $\sigma_a$ & $0.01 a$ (1\%) \\
+Hover times & -- & [2.0, 2.0, 2.0] s \\
+Max takeoff fraction & -- & $0.75$ \\
+Max translation fraction & -- & $0.33$ \\
 \bottomrule
 \end{tabular}
 \label{tab:parameters}
