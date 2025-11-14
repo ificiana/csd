@@ -114,7 +114,7 @@ class ThrustController:
         for name, value in axes.items():
             self.tracker.update(name, value, t)
         
-        if self.planner.phase > -1:
+        if self.planner.phase > 10:
             e_info = self.tracker.get_info("Roll")
             
             print(

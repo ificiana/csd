@@ -58,8 +58,11 @@ class TrajectoryPlanner:
                 return np.array([EAST, quintic.position(self.y_coeff, self.travel_n, t), H])
             case 5:
                 return np.array([EAST, NORTH, H])
+            case 6:
+                z_land = H - quintic.position(self.z_coeff, H - self.payload_h, t)
+                return np.array([EAST, NORTH, z_land])
             case _:
-                return np.array([EAST, NORTH, 0.0])
+                return np.array([EAST, NORTH, self.payload_h])
     
     def get_reference_velocity(self) -> np.ndarray:
         """Returns reference velocity for current trajectory phase."""
@@ -79,6 +82,9 @@ class TrajectoryPlanner:
                 return np.array([0.0, quintic.velocity(self.y_coeff, self.travel_n, t), 0.0])
             case 5:
                 return np.array([0.0, 0.0, 0.0])
+            case 6:
+                vz_land = -quintic.velocity(self.z_coeff, H - self.payload_h, t)
+                return np.array([0.0, 0.0, vz_land])
             case _:
                 return np.array([0.0, 0.0, 0.0])
     
@@ -96,75 +102,83 @@ class TrajectoryPlanner:
         t_global = get_time() - self.phase_start_time
         H = HEIGHT + self.payload_h
         
-        if self.phase == 0:
-            if pos[2] < H:
-                a_z = quintic.acceleration(self.z_coeff, HEIGHT, t_global) - gravity
-            else:
-                a_z = -gravity
-                self._advance_phase(1, "Reached height: {}", HEIGHT)
-            a_x = a_y = 0.0
-        
-        elif self.phase == 1:
-            if t_global > self.hover_times[0]:
-                self._advance_phase(2, "Hover complete, moving East")
-            a_x = a_y = 0.0
-            a_z = -gravity
-        
-        elif self.phase == 2:
-            dir_e = np.sign(EAST) if not np.isclose(EAST, 0.0) else 0.0
-            rem_e = EAST - pos[0]
-            arrived_e = (
-                np.isclose(rem_e, 0.0, atol=self.tolerance)
-                or (dir_e > 0 and pos[0] >= EAST - self.tolerance)
-                or (dir_e < 0 and pos[0] <= EAST + self.tolerance)
-            )
+        match self.phase:
+            case 0:
+                if pos[2] < H:
+                    a_z = quintic.acceleration(self.z_coeff, HEIGHT, t_global) - gravity
+                else:
+                    a_z = -gravity
+                    self._advance_phase(1, "Reached height: {}", HEIGHT)
+                a_x = a_y = 0.0
             
-            if dir_e == 0.0 or arrived_e:
-                self._advance_phase(3, "Reached East: {}", EAST)
+            case 1:
+                if t_global > self.hover_times[0]:
+                    self._advance_phase(2, "Hover complete, moving East")
                 a_x = a_y = 0.0
                 a_z = -gravity
-            else:
-                a_x = dir_e * quintic.acceleration(self.x_coeff, self.travel_e, t_global)
-                a_y = 0.0
-                a_z = -gravity
-        
-        elif self.phase == 3:
-            if t_global > self.hover_times[1]:
-                self._advance_phase(4, "Hover complete, moving North")
-            a_x = a_y = 0.0
-            a_z = -gravity
-        
-        elif self.phase == 4:
-            dir_n = np.sign(NORTH) if not np.isclose(NORTH, 0.0) else 0.0
-            rem_n = NORTH - pos[1]
-            arrived_n = (
-                np.isclose(rem_n, 0.0, atol=self.tolerance)
-                or (dir_n > 0 and pos[1] >= NORTH - self.tolerance)
-                or (dir_n < 0 and pos[1] <= NORTH + self.tolerance)
-            )
             
-            if dir_n == 0.0 or arrived_n:
-                self._advance_phase(5, "Reached North: {}", NORTH)
+            case 2:
+                dir_e = np.sign(EAST) if not np.isclose(EAST, 0.0) else 0.0
+                rem_e = EAST - pos[0]
+                arrived_e = (
+                    np.isclose(rem_e, 0.0, atol=self.tolerance)
+                    or (dir_e > 0 and pos[0] >= EAST - self.tolerance)
+                    or (dir_e < 0 and pos[0] <= EAST + self.tolerance)
+                )
+                
+                if dir_e == 0.0 or arrived_e:
+                    self._advance_phase(3, "Reached East: {}", EAST)
+                    a_x = a_y = 0.0
+                    a_z = -gravity
+                else:
+                    a_x = dir_e * quintic.acceleration(self.x_coeff, self.travel_e, t_global)
+                    a_y = 0.0
+                    a_z = -gravity
+            
+            case 3:
+                if t_global > self.hover_times[1]:
+                    self._advance_phase(4, "Hover complete, moving North")
                 a_x = a_y = 0.0
                 a_z = -gravity
-            else:
-                a_x = 0.0
-                a_y = dir_n * quintic.acceleration(self.y_coeff, self.travel_n, t_global)
+            
+            case 4:
+                dir_n = np.sign(NORTH) if not np.isclose(NORTH, 0.0) else 0.0
+                rem_n = NORTH - pos[1]
+                arrived_n = (
+                    np.isclose(rem_n, 0.0, atol=self.tolerance)
+                    or (dir_n > 0 and pos[1] >= NORTH - self.tolerance)
+                    or (dir_n < 0 and pos[1] <= NORTH + self.tolerance)
+                )
+                
+                if dir_n == 0.0 or arrived_n:
+                    self._advance_phase(5, "Reached North: {}", NORTH)
+                    a_x = a_y = 0.0
+                    a_z = -gravity
+                else:
+                    a_x = 0.0
+                    a_y = dir_n * quintic.acceleration(self.y_coeff, self.travel_n, t_global)
+                    a_z = -gravity
+            
+            case 5:
+                if t_global > self.hover_times[2]:
+                    self._advance_phase(6, "Hover complete, initiating soft landing")
+                a_x = a_y = 0.0
                 a_z = -gravity
-        
-        elif self.phase == 5:
-            a_x = a_y = 0.0
-            a_z = -gravity
-        
-        elif self.phase == 6:
-            a_x = a_y = a_z = 0.0
-            if np.isclose(pos[2], self.payload_h, atol=self.tolerance):
-                print("\nLanded!")
-                self.phase = 7
-        
-        else:
-            print("\nTrajectory complete.")
-            exit(0)
+            
+            case 6:
+                H = HEIGHT + self.payload_h
+                landing_distance = H - self.payload_h
+                if pos[2] <= self.payload_h + self.tolerance:
+                    print("\nLanded!")
+                    self.phase = 7
+                    a_x = a_y = a_z = 0.0
+                else:
+                    a_x = a_y = 0.0
+                    a_z = -quintic.acceleration(self.z_coeff, landing_distance, t_global) - gravity
+            
+            case _:
+                print("\nTrajectory complete.")
+                exit(0)
         
         return a_x, a_y, a_z
     

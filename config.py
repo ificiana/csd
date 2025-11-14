@@ -52,7 +52,7 @@ CUBE_SIZE = 1  # meters
 # DRONE PARAMETERS (base values)
 # ============================================================================
 DRONE_MASS = 1  # kg (base mass, subject to random variation)
-DRONE_MAX_THRUST = 50  # N
+DRONE_MAX_THRUST = 200  # N
 DRONE_TIME_CONSTANT = 0.2  # Motor response time constant (seconds)
 
 # Noise parameters
@@ -82,14 +82,14 @@ NORTH = 10  # Target northward position (meters)
 # ============================================================================
 # TRAJECTORY PHASE TIMING
 # ============================================================================
-HOVER_TIMES = [2.0, 2.0, 10.0]  # Hover durations at each waypoint (seconds)
+HOVER_TIMES = [2.0, 2.0, 2.0]  # Hover durations at each waypoint (seconds)
 
 # ============================================================================
 # CONTROLLER GAINS
 # ============================================================================
 # Attitude control gains (Lee 2010 geometric controller)
-KR_AMOUNT = 100.0  # Attitude error gain
-KW_AMOUNT = 100.0  # Angular velocity error gain
+KR_AMOUNT = 2.0  # Attitude error gain
+KW_AMOUNT = 2.0  # Angular velocity error gain
 
 # Position controller gains (Ziegler-Nichols tuned)
 KU_XY = 4  # Ultimate gain for X/Y axes
@@ -103,8 +103,8 @@ KI_POS_AMOUNT = np.diag([0 * KU_XY / TU_XY, 0 * KU_XY / TU_XY, 0 * KU_Z / TU_Z])
 KD_AMOUNT = np.diag([0.1 * KU_XY * TU_XY, 0.1 * KU_XY * TU_XY, 0.1 * KU_Z * TU_Z])
 
 # Conditional controller gains (set to 0 if disabled)
-KR = KR_AMOUNT if ENABLE_ATTITUDE_CONTROLLER else 0.0
-KW = KW_AMOUNT if ENABLE_ATTITUDE_CONTROLLER else 0.0
+KR = KR_AMOUNT * DRONE_MAX_THRUST if ENABLE_ATTITUDE_CONTROLLER else 0.0
+KW = KW_AMOUNT * DRONE_MAX_THRUST if ENABLE_ATTITUDE_CONTROLLER else 0.0
 KP = KP_AMOUNT if ENABLE_POSITION_CONTROLLER else np.zeros((3, 3))
 KI_POS = KI_POS_AMOUNT if ENABLE_POSITION_CONTROLLER else np.zeros((3, 3))
 KD = KD_AMOUNT if ENABLE_POSITION_CONTROLLER else np.zeros((3, 3))
