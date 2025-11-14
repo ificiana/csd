@@ -169,7 +169,9 @@ class TrajectoryPlanner:
                 H = HEIGHT + self.payload_h
                 landing_distance = H - self.payload_h
                 if pos[2] <= self.payload_h + self.tolerance:
-                    print("\nLanded!")
+                    print("\n" + "=" * 80)
+                    print("PAYLOAD LANDED SUCCESSFULLY!")
+                    print("=" * 80)
                     self.phase = 7
                     a_x = a_y = a_z = 0.0
                 else:
@@ -177,7 +179,9 @@ class TrajectoryPlanner:
                     a_z = -quintic.acceleration(self.z_coeff, landing_distance, t_global) - gravity
             
             case _:
-                print("\nTrajectory complete.")
+                print("\n" + "=" * 80)
+                print("SIMULATION COMPLETE")
+                print("=" * 80)
                 exit(0)
         
         return a_x, a_y, a_z
@@ -186,7 +190,7 @@ class TrajectoryPlanner:
         """Advances to next phase and resets timer."""
         self.phase = new_phase
         self.phase_start_time = get_time()
-        print("\n" + message.format(*args))
+        print(f"\n[PHASE {new_phase}] " + message.format(*args))
     
     def check_ground_contact(self, bottom_corners: np.ndarray) -> bool:
         """
@@ -205,7 +209,9 @@ class TrajectoryPlanner:
         bottom_min_idx = np.argmin(B)
         penetration = B[bottom_min_idx]
         if penetration < 0:
-            print("\nLanded or crashed!")
+            print("\n" + "!" * 80)
+            print("GROUND CONTACT DETECTED - CRASH OR HARD LANDING!")
+            print("!" * 80)
             self.phase = 7
             return True
         return False

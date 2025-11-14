@@ -88,13 +88,13 @@ HOVER_TIMES = [2.0, 2.0, 2.0]  # Hover durations at each waypoint (seconds)
 # CONTROLLER GAINS
 # ============================================================================
 # Attitude control gains (Lee 2010 geometric controller)
-KR_AMOUNT = 2.0  # Attitude error gain
-KW_AMOUNT = 2.0  # Angular velocity error gain
+KR_AMOUNT = 4.0  # Attitude error gain
+KW_AMOUNT = 4.0  # Angular velocity error gain
 
 # Position controller gains (Ziegler-Nichols tuned)
-KU_XY = 4  # Ultimate gain for X/Y axes
+KU_XY = 0.08 * DRONE_MAX_THRUST  # Ultimate gain for X/Y axes
 TU_XY = 3.14  # Ultimate period for X/Y axes
-KU_Z = 6  # Ultimate gain for Z axis
+KU_Z = 0.12 * DRONE_MAX_THRUST  # Ultimate gain for Z axis
 TU_Z = 2.56  # Ultimate period for Z axis
 
 # PID gain amounts (computed from Ziegler-Nichols parameters)

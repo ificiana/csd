@@ -99,9 +99,10 @@ class ThrustController:
         self._update_telemetry(pos)
     
     def _update_telemetry(self, pos: np.ndarray):
-        """Updates oscillation tracking and prints status."""
+        """Updates oscillation tracking and prints live telemetry."""
         t = get_time()
         yaw, pitch, roll = self.payload.orientation.as_euler("ZYX", degrees=True)
+        vel = self.payload.vel
         
         axes = {
             "N": pos[1],
@@ -114,23 +115,29 @@ class ThrustController:
         for name, value in axes.items():
             self.tracker.update(name, value, t)
         
-        if self.planner.phase > 10:
-            e_info = self.tracker.get_info("Roll")
-            
-            print(
-                f"[{t:.2f}s] Payload COM Position: "
-                f"Y={yaw:.1f}, P={pitch:.1f}, R={roll:.1f} | "
-                f"max={e_info['max']:.1f} at {e_info['t_max']:.2f}s, "
-                f"min={e_info['min']:.1f} at {e_info['t_min']:.2f}s | "
-                f"period={e_info['period']:.2f}s",
-                f"aplitude={e_info['current_amplitude']:.1f}",
-                end="\r",
-            )
+        # Phase names for display
+        phase_names = {
+            0: "TAKEOFF",
+            1: "HOVER-1",
+            2: "TRANSLATE-E",
+            3: "HOVER-2",
+            4: "TRANSLATE-N",
+            5: "HOVER-3",
+            6: "LANDING",
+            7: "COMPLETE"
+        }
+        phase_name = phase_names.get(self.planner.phase, "UNKNOWN")
         
-        else:
-            print(
-                f"[{get_time():.2f}s] Payload COM Position: N={pos[1]:.3f}, "
-                f"E={pos[0]:.3f}, D={-pos[2]:.3f}, Yaw={yaw:.1f}, "
-                f"Pitch={pitch:.1f}, Roll={roll:.1f}",
-                end="\r",
-            )
+        # Calculate reference errors
+        ref_pos = self.planner.get_reference_position()
+        pos_err = np.linalg.norm(pos - ref_pos)
+        
+        # Live telemetry display
+        print(
+            f"[{t:6.2f}s] Phase: {phase_name:12s} | "
+            f"Pos: N={pos[1]:7.3f} E={pos[0]:7.3f} D={-pos[2]:7.3f} | "
+            f"Vel: {np.linalg.norm(vel):6.3f} m/s | "
+            f"Att: Y={yaw:6.1f}° P={pitch:6.1f}° R={roll:6.1f}° | "
+            f"Err: {pos_err:6.4f} m",
+            end="\r",
+        )

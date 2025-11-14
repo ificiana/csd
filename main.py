@@ -51,8 +51,13 @@ from config import (
     ATTACHMENT_POINTS,
     CUBE_MASS,
     CUBE_SIZE,
+    EAST,
     ENABLE_PROFILING,
     G_ACCELERATION,
+    HEIGHT,
+    MAX_TAKEOFF_FRACTION,
+    MAX_TRANSL_FRACTION,
+    NORTH,
     SIM_DURATION,
     TIME_SCALE_FACTOR,
 )
@@ -138,14 +143,63 @@ class Cube(Entity):
 
 
 drones = [Drone(e) for e in range(4)]
-print(*[f"{d.topic}:{d.mass}" for d in drones])
 drone_total_mass = sum(d.mass for d in drones)
 payload = Cube(np.array([0, 0, 0]))
-print(payload.mass)
 
 np.random.seed(ATTACHMENT_ERROR_SEED)
 attachment_error = np.random.normal(0, ATTACHMENT_ERROR_SCALE * payload.size, (4, 3))
 controller = ThrustController(payload=payload, drones=drones)
+
+def print_initialization():
+    """Prints simulation configuration banner."""
+    print("=" * 80)
+    print("COOPERATIVE PAYLOAD TRANSPORT SIMULATION")
+    print("=" * 80)
+    print()
+    print("PAYLOAD CONFIGURATION:")
+    print(f"  Mass:            {payload.mass:.2f} kg")
+    print(f"  Size:            {payload.size:.2f} m")
+    print(f"  Moment of Inertia: {payload.moi[0,0]:.4f} kg·m²")
+    print()
+    print("DRONE CONFIGURATION:")
+    for i, d in enumerate(drones):
+        print(f"  Drone {i}:  Mass = {d.mass:.4f} kg, Max Thrust = {d.max_thrust:.1f} N")
+    print(f"  Total Mass:      {drone_total_mass:.4f} kg")
+    print()
+    print("SYSTEM CONFIGURATION:")
+    print(f"  Total Mass:      {controller.mass:.2f} kg")
+    print(f"  Max Thrust:      {drones[0].max_thrust * 4:.1f} N")
+    print(f"  Max Takeoff:     {controller.max_takeoff:.1f} N ({MAX_TAKEOFF_FRACTION*100:.0f}%)")
+    print(f"  Max Translation: {controller.max_transl:.1f} N ({MAX_TRANSL_FRACTION*100:.0f}%)")
+    print(f"  Max Control:     {controller.max_control:.1f} N")
+    print()
+    print("TRAJECTORY COEFFICIENTS:")
+    print(f"  Z (vertical):    {controller.z_coeff:.4f}")
+    print(f"  X (east):        {controller.x_coeff:.4f}")
+    print(f"  Y (north):       {controller.y_coeff:.4f}")
+    print()
+    print("WAYPOINTS:")
+    print(f"  Takeoff Height:  {HEIGHT:.1f} m")
+    print(f"  East Target:     {EAST:.1f} m")
+    print(f"  North Target:    {NORTH:.1f} m")
+    print()
+    print("SIMULATION PARAMETERS:")
+    print(f"  Time Step:       {TIME_STEP:.4f} s")
+    print(f"  Duration:        {SIM_DURATION:.1f} s")
+    print(f"  Time Scale:      {TIME_SCALE_FACTOR:.2f}x")
+    print(f"  Gravity:         {G_ACCELERATION:.5f} m/s²")
+    print()
+    print("NOISE & ERRORS:")
+    print(f"  Attachment Error Seed:  {ATTACHMENT_ERROR_SEED}")
+    print(f"  Attachment Error Scale: {ATTACHMENT_ERROR_SCALE:.6f}")
+    print(f"  Attachment Error RMS:   {np.linalg.norm(attachment_error) / 4:.6f} m")
+    print()
+    print("=" * 80)
+    print("STARTING SIMULATION...")
+    print("=" * 80)
+    print()
+
+print_initialization()
 
 
 def tick():
