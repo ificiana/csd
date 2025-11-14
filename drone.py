@@ -5,17 +5,17 @@ Theory:
     Real quadrotor motors exhibit first-order lag dynamics when responding
     to thrust commands due to motor and propeller inertia. The continuous-time
     response is modeled as:
-    
+
         tau * dT/dt + T = T_c
-    
+
     where tau is the time constant, T is actual thrust, and T_c is commanded
     thrust. Using forward Euler discretization with time step dt:
-    
+
         T(t + dt) = T(t) + (T_c - T(t)) * dt/tau
-    
+
     This can be written as:
         T(t + dt) = T(t) + (T_c - T(t)) * alpha
-    
+
     where alpha = min(dt/tau, 1) is the discrete response rate, clamped to
     prevent instability when dt > tau.
 """
@@ -37,7 +37,7 @@ discrete_response_rate = np.clip(TIME_STEP / max(DRONE_TIME_CONSTANT, 1e-6), 0.0
 
 class Drone(Entity):
     """Quadrotor drone with first-order thrust dynamics and noise."""
-    
+
     mass = float(DRONE_MASS)
     max_thrust = float(DRONE_MAX_THRUST)
 

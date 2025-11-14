@@ -13,7 +13,7 @@ from tel import MMapJSON
 
 class Entity:
     """Base class for simulation entities with telemetry capabilities."""
-    
+
     def __init__(self, topic: str) -> None:
         self.topic = topic
         self.transmitter = MMapJSON(f"channel/{topic}")

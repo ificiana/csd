@@ -5,30 +5,30 @@ Theory:
     This module implements 6-DOF rigid body dynamics for a cubic payload
     being transported by multiple quadrotor drones. The dynamics follow
     Newton-Euler equations:
-    
+
     TRANSLATIONAL MOTION:
         m * dv/dt = sum(F_ext)
         dx/dt = v
-    
+
     where F_ext includes drone thrusts and gravity.
-    
+
     ROTATIONAL MOTION:
         I * domega/dt = sum(tau_ext) - omega x (I * omega)
-    
+
     where tau_ext are external torques from drone forces at attachment
     points, and the second term is the gyroscopic (Coriolis) effect.
-    
+
     ORIENTATION INTEGRATION:
         The orientation R in SO(3) is updated using exponential map:
         R(t + dt) = R(t) * exp(omega * dt)
-    
+
     where exp is the matrix exponential (implemented via Rodrigues formula
     in scipy.spatial.transform.Rotation.from_rotvec).
-    
+
     MOMENT OF INERTIA:
         For a uniform cube with mass m and side length a:
         I = (m * a^2 / 6) * eye(3)
-    
+
     GROUND CONTACT:
         Simple penetration-based contact: if any bottom corner has z < 0,
         the payload is projected back to ground level and all velocities
@@ -70,7 +70,7 @@ G = np.array([0, 0, G_ACCELERATION])
 
 class Cube(Entity):
     """Rigid body payload with 6-DOF dynamics."""
-    
+
     mass = CUBE_MASS
     size = CUBE_SIZE
     h = size / 2
@@ -78,7 +78,7 @@ class Cube(Entity):
     def __init__(self, pos: np.ndarray, topic: str = "cube") -> None:
         super().__init__(topic)
         self.pos = pos + np.array([0, 0, self.h])
-        self.moi = ((1 / 6) * self.mass * self.size**2) * np.eye(3)
+        self.moi = ((self.mass / 6 + drone_total_mass / 2) * self.size**2) * np.eye(3)
         self.orientation = R.identity()
         self.omega = np.zeros(3)
         self.alpha = np.zeros(3)
@@ -94,7 +94,9 @@ class Cube(Entity):
     @property
     def bottom(self):
         """Returns world coordinates of bottom corners."""
-        local_coords = np.column_stack([ATTACHMENT_POINTS * self.h, np.full(4, -self.h)])
+        local_coords = np.column_stack(
+            [ATTACHMENT_POINTS * self.h, np.full(4, -self.h)]
+        )
         return self.orientation.apply(local_coords) + self.pos
 
     def set_alpha(self, torques: np.ndarray):
@@ -122,8 +124,10 @@ class Cube(Entity):
         bottom_min_idx = np.argmin(B)
         penetration = B[bottom_min_idx]
         if penetration < 0:
-            if np.linalg.norm(self.vel) > 0.01:
-                print(f"Ground Hit- Impact Velocity: {np.linalg.norm(self.vel):.2f} m/s \n")
+            if np.linalg.norm(self.vel) > 0.1:
+                print(
+                    f"Ground Hit- Impact Velocity: {np.linalg.norm(self.vel):.2f} m/s \n"
+                )
             self.pos -= [0, 0, penetration]
             self.alpha = np.zeros(3)
             self.acc = np.zeros(3)
@@ -152,6 +156,7 @@ np.random.seed(ATTACHMENT_ERROR_SEED)
 attachment_error = np.random.normal(0, ATTACHMENT_ERROR_SCALE * payload.size, (4, 3))
 controller = ThrustController(payload=payload, drones=drones)
 
+
 def print_initialization():
     """Prints simulation configuration banner."""
     print("=" * 80)
@@ -165,14 +170,20 @@ def print_initialization():
     print()
     print("DRONE CONFIGURATION:")
     for i, d in enumerate(drones):
-        print(f"  Drone {i}:  Mass = {d.mass:.4f} kg, Max Thrust = {d.max_thrust:.1f} N")
+        print(
+            f"  Drone {i}:  Mass = {d.mass:.4f} kg, Max Thrust = {d.max_thrust:.1f} N"
+        )
     print(f"  Total Mass:      {drone_total_mass:.4f} kg")
     print()
     print("SYSTEM CONFIGURATION:")
     print(f"  Total Mass:      {controller.mass:.2f} kg")
     print(f"  Max Thrust:      {drones[0].max_thrust * 4:.1f} N")
-    print(f"  Max Takeoff:     {controller.max_takeoff:.1f} N ({MAX_TAKEOFF_FRACTION*100:.0f}%)")
-    print(f"  Max Translation: {controller.max_transl:.1f} N ({MAX_TRANSL_FRACTION*100:.0f}%)")
+    print(
+        f"  Max Takeoff:     {controller.max_takeoff:.1f} N ({MAX_TAKEOFF_FRACTION*100:.0f}%)"
+    )
+    print(
+        f"  Max Translation: {controller.max_transl:.1f} N ({MAX_TRANSL_FRACTION*100:.0f}%)"
+    )
     print(f"  Max Control:     {controller.max_control:.1f} N")
     print()
     print("TRAJECTORY COEFFICIENTS:")
@@ -201,6 +212,7 @@ def print_initialization():
     print("=" * 80)
     print()
 
+
 print_initialization()
 
 
@@ -212,14 +224,14 @@ def tick():
     attachment_points = payload.top + attachment_error
     for d, pos in zip(drones, attachment_points):
         d.pos = pos.copy()
-    
+
     r_vectors = attachment_points - payload.pos
     drone_masses = np.array([d.mass for d in drones])
     drone_thrusts = np.array([d.thrust for d in drones])
-    
-    forces = drone_thrusts + drone_masses[:, np.newaxis] * G
+
+    forces = drone_thrusts + drone_masses[:, np.newaxis] * G  # type: ignore
     torques = np.cross(r_vectors, forces)
-    
+
     payload.set_alpha(torques)
     payload.set_acc(forces)
     payload.tick()
@@ -230,6 +242,7 @@ def tick():
 
 
 COMPENSATE = False
+
 
 def main():
     """Main simulation loop."""
@@ -249,6 +262,7 @@ def main():
 if __name__ == "__main__":
     if ENABLE_PROFILING:
         import cProfile
+
         cProfile.run("main()", "prof")
     else:
         main()

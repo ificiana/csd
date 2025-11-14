@@ -17,8 +17,8 @@ from .position import PositionController
 from .thrust import ThrustController
 
 __all__ = [
-    'AttitudeController',
-    'PositionController', 
-    'TrajectoryPlanner',
-    'ThrustController',
+    "AttitudeController",
+    "PositionController",
+    "TrajectoryPlanner",
+    "ThrustController",
 ]

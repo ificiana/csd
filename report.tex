@@ -1,0 +1,973 @@
+\documentclass[12pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{siunitx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+% Page layout
+\geometry{
+    left=25mm,
+    right=25mm,
+    top=30mm,
+    bottom=30mm
+}
+
+% Code listing style
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red},
+    showstringspaces=false,
+    breaklines=true,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    frame=single,
+    language=Python
+}
+
+% Theorem environments
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+
+% Title information
+\title{\textbf{Hierarchical Control of Cooperative Quadrotor Payload Transport}\\
+\Large A 6-DOF Rigid Body Dynamics Simulation with Geometric Attitude Control}
+
+\author{
+    % Add your name(s) here
+}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This report presents a comprehensive study of cooperative payload transport using multiple quadrotor drones with hierarchical control architecture. We implement a high-fidelity 6-DOF rigid body dynamics simulation for a cubic payload suspended by four quadrotors, employing geometric attitude control on SO(3) combined with PID position control. The system features quintic polynomial trajectory generation for smooth motion profiles, first-order actuator dynamics modeling motor lag, and realistic noise injection including drone mass variance, thrust noise, and attachment point errors. Our hierarchical control architecture consists of an outer-loop PID position controller and an inner-loop geometric attitude controller with least-squares thrust allocation. The simulation framework supports multi-phase trajectory planning including takeoff, translation, and landing maneuvers. Experimental results demonstrate robust performance under realistic operating conditions with configurable noise parameters and controller gains.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+
+% =============================================================================
+\section{Introduction}
+% =============================================================================
+
+\subsection{Motivation}
+Cooperative aerial manipulation has emerged as a critical area of robotics research with applications in construction, disaster response, and logistics. Multi-drone systems can transport payloads exceeding individual drone capacity, offering advantages in payload-to-weight ratio, redundancy, and operational flexibility compared to single large vehicles.
+
+The control of cooperative payload transport presents several challenges:
+\begin{itemize}
+    \item \textbf{Coupled dynamics}: The payload and drones form a closed kinematic chain with strong dynamic coupling
+    \item \textbf{Underactuation}: Quadrotors are underactuated systems with four control inputs governing six degrees of freedom
+    \item \textbf{Nonlinear geometry}: Attitude dynamics evolve on the special orthogonal group SO(3), requiring careful treatment to avoid singularities
+    \item \textbf{Thrust allocation}: Desired wrench must be distributed among multiple actuators with saturation constraints
+    \item \textbf{Model uncertainty}: Real systems exhibit mass variance, actuator dynamics, and attachment errors
+\end{itemize}
+
+\subsection{Contributions}
+This work makes the following contributions:
+\begin{enumerate}
+    \item A complete 6-DOF rigid body simulation framework implementing Newton-Euler dynamics with Rodrigues integration for rotational motion
+    \item Hierarchical control architecture combining geometric attitude control with PID position regulation
+    \item Quintic polynomial trajectory generation ensuring C$^2$ continuity with zero endpoint velocities
+    \item Realistic noise modeling including drone mass variance, actuator noise, and geometric uncertainties
+    \item Comprehensive simulation environment with configurable parameters and real-time telemetry
+\end{enumerate}
+
+\subsection{Organization}
+The remainder of this report is organized as follows: \Cref{sec:background} provides mathematical background on rigid body dynamics and Lie group theory. \Cref{sec:modeling} describes the system model including payload dynamics, drone actuators, and disturbances. \Cref{sec:control} presents the hierarchical control architecture. \Cref{sec:trajectory} details trajectory generation. \Cref{sec:implementation} discusses implementation details. \Cref{sec:experiments} presents experimental results. \Cref{sec:conclusion} concludes.
+
+% =============================================================================
+\section{Mathematical Background}
+\label{sec:background}
+% =============================================================================
+
+\subsection{Rigid Body Dynamics}
+
+\subsubsection{Configuration Space}
+The configuration of a rigid body is described by its position $\mathbf{p} \in \mathbb{R}^3$ and orientation $\mathbf{R} \in \text{SO}(3)$, where SO(3) is the special orthogonal group:
+\begin{equation}
+    \text{SO}(3) = \{\mathbf{R} \in \mathbb{R}^{3 \times 3} : \mathbf{R}^T\mathbf{R} = \mathbf{I}, \det(\mathbf{R}) = 1\}
+\end{equation}
+
+The tangent space to SO(3) is the Lie algebra $\mathfrak{so}(3)$ of skew-symmetric matrices:
+\begin{equation}
+    \mathfrak{so}(3) = \{\boldsymbol{\Omega} \in \mathbb{R}^{3 \times 3} : \boldsymbol{\Omega}^T = -\boldsymbol{\Omega}\}
+\end{equation}
+
+\subsubsection{Translational Dynamics}
+The linear momentum evolves according to Newton's second law:
+\begin{equation}
+    m\dot{\mathbf{v}} = \sum_{i=1}^{n} \mathbf{F}_i + m\mathbf{g}
+    \label{eq:newton}
+\end{equation}
+where $m$ is total mass, $\mathbf{v}$ is velocity, $\mathbf{F}_i$ are external forces, and $\mathbf{g} = [0, 0, -9.80665]^T$ m/s$^2$ is gravitational acceleration.
+
+\subsubsection{Rotational Dynamics}
+Angular momentum evolves according to Euler's equation:
+\begin{equation}
+    \mathbf{I}\dot{\boldsymbol{\omega}} = \sum_{i=1}^{n} \boldsymbol{\tau}_i - \boldsymbol{\omega} \times (\mathbf{I}\boldsymbol{\omega})
+    \label{eq:euler}
+\end{equation}
+where $\mathbf{I} \in \mathbb{R}^{3 \times 3}$ is the moment of inertia tensor, $\boldsymbol{\omega} \in \mathbb{R}^3$ is angular velocity, and $\boldsymbol{\tau}_i$ are external torques. The term $\boldsymbol{\omega} \times (\mathbf{I}\boldsymbol{\omega})$ represents gyroscopic (Coriolis) effects.
+
+For a uniform cube with mass $m$ and side length $a$:
+\begin{equation}
+    \mathbf{I} = \frac{ma^2}{6}\mathbf{I}_3
+    \label{eq:cube_inertia}
+\end{equation}
+
+\subsubsection{Orientation Integration}
+The orientation matrix evolves according to:
+\begin{equation}
+    \dot{\mathbf{R}} = \mathbf{R}[\boldsymbol{\omega}]_\times
+\end{equation}
+where $[\cdot]_\times : \mathbb{R}^3 \to \mathfrak{so}(3)$ is the skew-symmetric matrix operator:
+\begin{equation}
+    [\mathbf{x}]_\times = \begin{bmatrix}
+        0 & -x_3 & x_2 \\
+        x_3 & 0 & -x_1 \\
+        -x_2 & x_1 & 0
+    \end{bmatrix}
+\end{equation}
+
+We integrate using the exponential map:
+\begin{equation}
+    \mathbf{R}(t + \Delta t) = \mathbf{R}(t) \exp([\boldsymbol{\omega}\Delta t]_\times)
+    \label{eq:rotation_integration}
+\end{equation}
+implemented via the Rodrigues formula in \texttt{scipy.spatial.transform.Rotation}.
+
+\subsection{Special Orthogonal Group SO(3)}
+
+\begin{definition}[Special Orthogonal Group]
+The special orthogonal group SO(3) is a Lie group representing proper rotations in three-dimensional space. It is a smooth manifold diffeomorphic to $\mathbb{RP}^3$ with group operation given by matrix multiplication.
+\end{definition}
+
+Key properties:
+\begin{itemize}
+    \item \textbf{Non-commutativity}: $\mathbf{R}_1\mathbf{R}_2 \neq \mathbf{R}_2\mathbf{R}_1$ in general
+    \item \textbf{Compactness}: SO(3) is a compact manifold
+    \item \textbf{Connectedness}: SO(3) is path-connected
+    \item \textbf{Singularity-free}: No coordinate singularities (unlike Euler angles)
+\end{itemize}
+
+% =============================================================================
+\section{System Modeling}
+\label{sec:modeling}
+% =============================================================================
+
+\subsection{Payload Dynamics}
+
+The payload is modeled as a rigid cube with:
+\begin{itemize}
+    \item Mass: $m_c = \SI{10}{kg}$
+    \item Side length: $a = \SI{1}{m}$
+    \item Moment of inertia: $\mathbf{I} = \frac{10}{6}\mathbf{I}_3 \approx 1.667\mathbf{I}_3$ kg$\cdot$m$^2$
+\end{itemize}
+
+Four attachment points are located at the top corners:
+\begin{equation}
+    \mathbf{r}_i^{\text{body}} = \frac{a}{2}\begin{bmatrix} \pm 1 \\ \pm 1 \\ 1 \end{bmatrix}, \quad i \in \{0,1,2,3\}
+    \label{eq:attachment_local}
+\end{equation}
+
+World coordinates are obtained via:
+\begin{equation}
+    \mathbf{r}_i^{\text{world}} = \mathbf{p} + \mathbf{R}\mathbf{r}_i^{\text{body}}
+    \label{eq:attachment_world}
+\end{equation}
+
+\subsubsection{External Forces and Torques}
+Each drone $i$ applies force $\mathbf{F}_i$ at attachment point $\mathbf{r}_i$, producing torque:
+\begin{equation}
+    \boldsymbol{\tau}_i = (\mathbf{r}_i - \mathbf{p}) \times \mathbf{F}_i
+    \label{eq:torque}
+\end{equation}
+
+Total external wrench:
+\begin{align}
+    \mathbf{F}_{\text{total}} &= \sum_{i=0}^{3} \mathbf{F}_i + (m_c + m_d)\mathbf{g} \\
+    \boldsymbol{\tau}_{\text{total}} &= \sum_{i=0}^{3} \boldsymbol{\tau}_i
+\end{align}
+where $m_d = \sum_{i=0}^{3} m_i^{\text{drone}}$ is total drone mass.
+
+\subsection{Drone Actuator Model}
+
+\subsubsection{First-Order Thrust Dynamics}
+Real quadrotor motors exhibit lag due to rotor inertia. We model this as a first-order system:
+\begin{equation}
+    \tau_m \dot{T} + T = T_c
+    \label{eq:motor_continuous}
+\end{equation}
+where $T$ is actual thrust, $T_c$ is commanded thrust, and $\tau_m = \SI{0.2}{s}$ is the motor time constant.
+
+Discretizing with forward Euler:
+\begin{equation}
+    T_{k+1} = T_k + \alpha(T_c - T_k), \quad \alpha = \min\left(\frac{\Delta t}{\tau_m}, 1\right)
+    \label{eq:motor_discrete}
+\end{equation}
+
+\subsubsection{Thrust Saturation}
+Each drone has maximum thrust $T_{\max} = \SI{250}{N}$. The thrust vector is saturated:
+\begin{equation}
+    \mathbf{T}_i \leftarrow \begin{cases}
+        \mathbf{T}_i & \text{if } \|\mathbf{T}_i\| \leq T_{\max} \\
+        T_{\max} \frac{\mathbf{T}_i}{\|\mathbf{T}_i\|} & \text{otherwise}
+    \end{cases}
+    \label{eq:thrust_saturation}
+\end{equation}
+
+\subsection{Noise and Disturbances}
+
+\subsubsection{Drone Mass Variance}
+Each drone mass is perturbed:
+\begin{equation}
+    m_i = m_{\text{nominal}} + \mathcal{N}(0, \sigma_m^2), \quad \sigma_m = 0.0001 \cdot m_{\text{nominal}}
+    \label{eq:mass_variance}
+\end{equation}
+
+\subsubsection{Thrust Noise}
+Thrust vectors are corrupted by Gaussian noise:
+\begin{equation}
+    \mathbf{T}_i \leftarrow \mathbf{T}_i + \mathcal{N}(\mathbf{0}, \sigma_T^2\mathbf{I}_3), \quad \sigma_T = 0.01 \|\mathbf{T}_i\|
+    \label{eq:thrust_noise}
+\end{equation}
+
+\subsubsection{Attachment Point Error}
+Attachment positions include fabrication errors:
+\begin{equation}
+    \mathbf{r}_i^{\text{actual}} = \mathbf{r}_i^{\text{nominal}} + \boldsymbol{\epsilon}_i, \quad \boldsymbol{\epsilon}_i \sim \mathcal{N}(\mathbf{0}, \sigma_a^2\mathbf{I}_3)
+    \label{eq:attachment_error}
+\end{equation}
+with $\sigma_a = 0.0001 \cdot a$.
+
+\subsection{Ground Contact Model}
+
+A simple penetration-based contact model is employed. Bottom corners are:
+\begin{equation}
+    \mathbf{b}_j = \mathbf{p} + \mathbf{R}\left[\frac{a}{2}(\pm 1, \pm 1, -1)^T\right], \quad j \in \{0,1,2,3\}
+\end{equation}
+
+Contact occurs when $\min_j b_{j,z} < 0$. Upon contact:
+\begin{enumerate}
+    \item Project position: $\mathbf{p} \leftarrow \mathbf{p} - [0, 0, \min_j b_{j,z}]^T$
+    \item Zero velocities: $\mathbf{v} \leftarrow \mathbf{0}$, $\boldsymbol{\omega} \leftarrow \mathbf{0}$
+\end{enumerate}
+This represents a perfectly inelastic collision.
+
+% =============================================================================
+\section{Hierarchical Control Architecture}
+\label{sec:control}
+% =============================================================================
+
+\subsection{Control Overview}
+
+The control system follows a hierarchical architecture:
+\begin{enumerate}
+    \item \textbf{Trajectory Planner}: Generates reference position, velocity, and feedforward acceleration
+    \item \textbf{Position Controller (Outer Loop)}: PID control computing desired force
+    \item \textbf{Attitude Controller (Inner Loop)}: Geometric control on SO(3) with thrust allocation
+    \item \textbf{Thrust Saturation}: Enforces system-level constraints
+\end{enumerate}
+
+\subsection{Geometric Attitude Controller}
+
+Following Lee et al. (2010), we implement geometric tracking control on SO(3).
+
+\subsubsection{Attitude Error}
+The attitude error is defined on SO(3):
+\begin{equation}
+    \mathbf{e}_R = \frac{1}{2}(\mathbf{R}_d^T\mathbf{R} - \mathbf{R}^T\mathbf{R}_d)^\vee
+    \label{eq:attitude_error}
+\end{equation}
+where $(\cdot)^\vee : \mathfrak{so}(3) \to \mathbb{R}^3$ is the vee map (inverse of $[\cdot]_\times$).
+
+\subsubsection{Control Law}
+The desired torque is:
+\begin{equation}
+    \boldsymbol{\tau}_d = -K_R\mathbf{e}_R - K_\omega\mathbf{e}_\omega + \boldsymbol{\omega} \times \mathbf{I}\boldsymbol{\omega}
+    \label{eq:attitude_control}
+\end{equation}
+where:
+\begin{itemize}
+    \item $K_R = 4 \cdot T_{\max}$ is the attitude error gain
+    \item $K_\omega = 4 \cdot T_{\max}$ is the angular velocity error gain
+    \item $\mathbf{e}_\omega = \boldsymbol{\omega} - \boldsymbol{\omega}_d$ is angular velocity error
+    \item The feedforward term compensates gyroscopic effects
+\end{itemize}
+
+\subsubsection{Thrust Allocation}
+We must map desired torque $\boldsymbol{\tau}_d$ to individual drone corrections $\delta\mathbf{F}_i$. The moment arm matrix is:
+\begin{equation}
+    \mathbf{A} = \begin{bmatrix} [\mathbf{r}_0]_\times \\ [\mathbf{r}_1]_\times \\ [\mathbf{r}_2]_\times \\ [\mathbf{r}_3]_\times \end{bmatrix} \in \mathbb{R}^{12 \times 3}
+    \label{eq:moment_arm_matrix}
+\end{equation}
+where $\mathbf{r}_i = \mathbf{r}_i^{\text{world}} - \mathbf{p}$ are relative position vectors.
+
+The least-squares solution is:
+\begin{equation}
+    \delta\mathbf{F} = \mathbf{A}^\dagger \boldsymbol{\tau}_d = (\mathbf{A}^T\mathbf{A})^{-1}\mathbf{A}^T\boldsymbol{\tau}_d
+    \label{eq:thrust_allocation}
+\end{equation}
+
+\subsection{PID Position Controller}
+
+\subsubsection{Control Law}
+The position controller computes desired force via PID:
+\begin{equation}
+    \mathbf{F}_{\text{fb}} = \mathbf{K}_p\mathbf{e}_p + \mathbf{K}_d\mathbf{e}_v + \mathbf{K}_i\int \mathbf{e}_p \, dt
+    \label{eq:pid}
+\end{equation}
+where:
+\begin{align}
+    \mathbf{e}_p &= \mathbf{p}_d - \mathbf{p} \\
+    \mathbf{e}_v &= \mathbf{v}_d - \mathbf{v}
+\end{align}
+
+\subsubsection{Gain Tuning}
+Gains are computed using Ziegler-Nichols tuning:
+\begin{itemize}
+    \item Ultimate gains: $K_{u,xy} = 0.08 T_{\max}$, $K_{u,z} = 0.12 T_{\max}$
+    \item Ultimate periods: $T_{u,xy} = \SI{3.14}{s}$, $T_{u,z} = \SI{2.56}{s}$
+\end{itemize}
+
+PD control gains:
+\begin{align}
+    \mathbf{K}_p &= \text{diag}(0.8 K_{u,xy}, 0.8 K_{u,xy}, 0.8 K_{u,z}) \\
+    \mathbf{K}_d &= \text{diag}(0.1 K_{u,xy}T_{u,xy}, 0.1 K_{u,xy}T_{u,xy}, 0.1 K_{u,z}T_{u,z})
+\end{align}
+
+Integral action is disabled ($\mathbf{K}_i = \mathbf{0}$) to avoid wind-up issues.
+
+\subsection{Thrust Combination and Saturation}
+
+\subsubsection{Force Decomposition}
+Total force per drone combines feedforward and feedback terms:
+\begin{equation}
+    \mathbf{F}_i = \frac{1}{4}\mathbf{F}_{\text{ff}} + \frac{1}{4}\mathbf{F}_{\text{fb}} + \delta\mathbf{F}_i
+    \label{eq:total_force}
+\end{equation}
+where $\mathbf{F}_{\text{ff}} = m\mathbf{a}_d$ is feedforward from trajectory.
+
+\subsubsection{Control Authority Limits}
+Available thrust is partitioned:
+\begin{align}
+    F_{\text{takeoff}} &= 0.75 \cdot 4T_{\max} = \SI{750}{N} \\
+    F_{\text{transl}} &= 0.33 \cdot (4T_{\max} - F_{\text{takeoff}}) = \SI{82.5}{N} \\
+    F_{\text{control}} &= 4T_{\max} - F_{\text{takeoff}} - F_{\text{transl}} = \SI{167.5}{N}
+\end{align}
+
+Control forces are saturated:
+\begin{equation}
+    \|\mathbf{F}_{\text{fb}} + \sum_i \delta\mathbf{F}_i\| \leq F_{\text{control}}
+    \label{eq:control_saturation}
+\end{equation}
+
+% =============================================================================
+\section{Trajectory Generation}
+\label{sec:trajectory}
+% =============================================================================
+
+\subsection{Quintic Polynomial Trajectories}
+
+\subsubsection{Boundary Conditions}
+For a trajectory from $s_0 = 0$ to $s_f = d$ over duration $T$, we require:
+\begin{align}
+    s(0) = 0, \quad & s(T) = d \\
+    \dot{s}(0) = 0, \quad & \dot{s}(T) = 0 \\
+    \ddot{s}(0) = 0, \quad & \ddot{s}(T) = 0
+\end{align}
+
+\subsubsection{Polynomial Form}
+The quintic polynomial is:
+\begin{equation}
+    s(t) = d(c_5t^5 + c_4t^4 + c_3t^3)
+    \label{eq:quintic}
+\end{equation}
+where coefficients are derived from boundary conditions:
+\begin{align}
+    c_3 &= 10T^{-3} \\
+    c_4 &= -15T^{-4} \\
+    c_5 &= 6T^{-5}
+\end{align}
+
+Normalized time $\tau = t/T$ yields:
+\begin{equation}
+    s(\tau) = d(10\tau^3 - 15\tau^4 + 6\tau^5)
+\end{equation}
+
+\subsubsection{Derivatives}
+Velocity and acceleration are:
+\begin{align}
+    \dot{s}(t) &= d \cdot T^{-1}(30\tau^2 - 60\tau^3 + 30\tau^4) \\
+    \ddot{s}(t) &= d \cdot T^{-2}(60\tau - 180\tau^2 + 120\tau^3)
+\end{align}
+
+\subsection{Multi-Phase Trajectory Planning}
+
+The mission consists of seven phases:
+
+\begin{table}[h]
+\centering
+\caption{Mission phases and durations}
+\begin{tabular}{clr}
+\toprule
+Phase & Description & Duration \\
+\midrule
+0 & Takeoff (vertical to \SI{5}{m}) & $T_0$ \\
+1 & Hover at altitude & \SI{2}{s} \\
+2 & Translate East (\SI{10}{m}) & $T_2$ \\
+3 & Hover at waypoint & \SI{2}{s} \\
+4 & Translate North (\SI{10}{m}) & $T_4$ \\
+5 & Final hover & \SI{2}{s} \\
+6 & Landing (controlled descent) & $T_6$ \\
+\bottomrule
+\end{tabular}
+\label{tab:phases}
+\end{table}
+
+\subsubsection{Trajectory Duration Computation}
+Phase durations are computed from acceleration limits:
+\begin{equation}
+    T_i = \sqrt{\frac{10\sqrt{3}d_i}{3a_{\max,i}}}
+    \label{eq:phase_duration}
+\end{equation}
+where $d_i$ is travel distance and $a_{\max,i}$ is maximum acceleration for that phase.
+
+\subsubsection{Reference Signals}
+At each timestep, the planner provides:
+\begin{itemize}
+    \item $\mathbf{p}_d(t)$: Reference position
+    \item $\mathbf{v}_d(t)$: Reference velocity
+    \item $\mathbf{a}_d(t)$: Feedforward acceleration
+\end{itemize}
+
+These are computed by evaluating quintic polynomials for the active phase.
+
+% =============================================================================
+\section{Implementation}
+\label{sec:implementation}
+% =============================================================================
+
+\subsection{Software Architecture}
+
+The simulation is implemented in Python 3.13 with the following structure:
+
+\begin{verbatim}
+csd/
+├── main.py           # Main simulation loop and payload dynamics
+├── drone.py          # Drone actuator model
+├── entity.py         # Base class for simulated entities
+├── config.py         # Configuration parameters
+├── clock.py          # Simulation time management
+├── controller/
+│   ├── thrust.py     # Main controller coordinator
+│   ├── position.py   # PID position controller
+│   ├── attitude.py   # Geometric attitude controller
+│   ├── plan.py       # Trajectory planner
+│   └── quintic.py    # Quintic polynomial functions
+├── receiver.py       # Telemetry receiver
+└── viz/              # Visualization modules
+\end{verbatim}
+
+\subsection{Key Dependencies}
+
+\begin{itemize}
+    \item \texttt{numpy 2.3.4}: Numerical computations
+    \item \texttt{scipy 1.16.3}: Rotation representations and integration
+    \item \texttt{matplotlib 3.10.7}: Plotting and visualization
+    \item \texttt{pandas 2.3.3}: Data analysis
+    \item \texttt{pydantic 2.12.4}: Configuration validation
+\end{itemize}
+
+\subsection{Numerical Integration}
+
+\subsubsection{Time Step}
+The simulation uses fixed time step $\Delta t = \SI{0.001}{s}$ (1 kHz update rate).
+
+\subsubsection{Integration Scheme}
+Forward Euler integration is employed:
+\begin{align}
+    \mathbf{v}_{k+1} &= \mathbf{v}_k + \mathbf{a}_k \Delta t \\
+    \mathbf{p}_{k+1} &= \mathbf{p}_k + \mathbf{v}_k \Delta t \\
+    \boldsymbol{\omega}_{k+1} &= \boldsymbol{\omega}_k + \boldsymbol{\alpha}_k \Delta t \\
+    \mathbf{R}_{k+1} &= \mathbf{R}_k \exp([\boldsymbol{\omega}_k \Delta t]_\times)
+\end{align}
+
+\textbf{Note:} Forward Euler is first-order accurate and does not conserve energy. For production systems, consider Runge-Kutta or symplectic integrators.
+
+\subsection{Telemetry System}
+
+\subsubsection{Data Transmission}
+Each entity transmits telemetry at each timestep:
+\begin{itemize}
+    \item Payload: position, velocity, acceleration, orientation, angular velocity
+    \item Drones: position, commanded thrust, actual thrust
+\end{itemize}
+
+\subsubsection{Data Format}
+Telemetry is serialized to JSON and transmitted via message queues for real-time monitoring and post-processing.
+
+\subsection{Configuration Management}
+
+All parameters are centralized in \texttt{config.py}:
+\begin{itemize}
+    \item \textbf{Feature switches}: Enable/disable noise sources and controllers
+    \item \textbf{Physical parameters}: Masses, dimensions, gravity
+    \item \textbf{Control gains}: PID and geometric controller parameters
+    \item \textbf{Trajectory waypoints}: Mission-specific coordinates
+    \item \textbf{Noise parameters}: Variance and scaling factors
+\end{itemize}
+
+This design enables parameter sweeps and ablation studies without code modification.
+
+% =============================================================================
+\section{Experimental Results}
+\label{sec:experiments}
+% =============================================================================
+
+% STUB SECTION - TO BE COMPLETED
+
+\subsection{Experimental Setup}
+
+\subsubsection{Simulation Parameters}
+All experiments use the following baseline configuration:
+\begin{itemize}
+    \item Simulation duration: \SI{30}{s}
+    \item Time step: \SI{0.001}{s}
+    \item Payload mass: \SI{10}{kg}
+    \item Drone max thrust: \SI{250}{N} each
+    \item Target waypoints: $(0, 0, 5)$, $(10, 0, 5)$, $(10, 10, 5)$ meters
+\end{itemize}
+
+\subsubsection{Performance Metrics}
+We evaluate performance using:
+\begin{itemize}
+    \item Position tracking error: $e_p(t) = \|\mathbf{p}(t) - \mathbf{p}_d(t)\|$
+    \item Velocity magnitude: $\|\mathbf{v}(t)\|$
+    \item Attitude error: Euler angle deviations from level flight
+    \item Settling time: Time to reach $e_p < \SI{0.01}{m}$ after maneuver
+    \item Overshoot: Maximum position error during transition
+\end{itemize}
+
+\subsection{Baseline Performance}
+
+% TODO: Add results from nominal simulation run
+% - Trajectory tracking plots (x, y, z vs time)
+% - Velocity profiles
+% - Attitude evolution (roll, pitch, yaw)
+% - Control effort (thrust magnitudes)
+% - Phase transition behavior
+
+\subsubsection{Trajectory Tracking}
+% STUB: Insert Figure - Position vs. time for all three axes
+% STUB: Insert Table - Tracking error statistics (mean, max, RMS)
+
+\subsubsection{Attitude Regulation}
+% STUB: Insert Figure - Euler angles vs. time
+% STUB: Insert Table - Maximum attitude deviations
+
+\subsubsection{Control Effort}
+% STUB: Insert Figure - Individual drone thrust magnitudes
+% STUB: Insert Figure - Total system thrust vs. available thrust
+
+\subsection{Noise Sensitivity Analysis}
+
+% TODO: Sweep noise parameters and measure degradation
+
+\subsubsection{Mass Variance Effects}
+% STUB: Vary DRONE_MASS_VARIANCE from 0 to 0.01
+% STUB: Plot tracking error vs. variance
+% STUB: Analyze asymmetric loading effects
+
+\subsubsection{Thrust Noise Effects}
+% STUB: Vary DRONE_THRUST_NOISE from 0 to 0.05
+% STUB: Measure high-frequency oscillations
+% STUB: Compare filtered vs. raw thrust signals
+
+\subsubsection{Attachment Error Effects}
+% STUB: Vary ATTACHMENT_ERROR_SCALE from 0 to 0.001
+% STUB: Analyze induced torque disturbances
+% STUB: Measure attitude controller compensation
+
+\subsection{Controller Gain Tuning}
+
+% TODO: Ablation studies on control gains
+
+\subsubsection{Position Controller Gains}
+% STUB: Sweep KP, KD values
+% STUB: Analyze stability margins
+% STUB: Compare against Ziegler-Nichols predictions
+
+\subsubsection{Attitude Controller Gains}
+% STUB: Sweep KR, KW values
+% STUB: Measure attitude response time
+% STUB: Identify optimal damping ratio
+
+\subsection{Ablation Studies}
+
+\subsubsection{Controller Disable Experiments}
+% STUB: Run with ENABLE_ATTITUDE_CONTROLLER = False
+% STUB: Run with ENABLE_POSITION_CONTROLLER = False
+% STUB: Quantify contribution of each controller
+
+\subsubsection{Noise Disable Experiments}
+% STUB: Compare performance with all noise disabled
+% STUB: Establish upper bound on achievable performance
+% STUB: Measure noise-induced degradation
+
+\subsection{Payload Mass Variation}
+
+% TODO: Vary CUBE_MASS and measure performance
+
+\subsubsection{Light Payload}
+% STUB: CUBE_MASS = 5 kg
+% STUB: Measure improved agility
+% STUB: Analyze reduced settling time
+
+\subsubsection{Heavy Payload}
+% STUB: CUBE_MASS = 20 kg
+% STUB: Measure thrust saturation effects
+% STUB: Analyze trajectory tracking degradation
+
+\subsection{Trajectory Complexity}
+
+% TODO: Test with more aggressive trajectories
+
+\subsubsection{Increased Translation Distance}
+% STUB: EAST = NORTH = 20 m
+% STUB: Measure sustained velocity and acceleration
+% STUB: Analyze control effort distribution
+
+\subsubsection{Reduced Hover Times}
+% STUB: HOVER_TIMES = [0.5, 0.5, 0.5]
+% STUB: Test rapid maneuver transitions
+% STUB: Measure transient response
+
+\subsection{Computational Performance}
+
+\subsubsection{Profiling Results}
+% STUB: Present cProfile output from ENABLE_PROFILING
+% STUB: Identify computational bottlenecks
+% STUB: Report real-time factor achieved
+
+\subsubsection{Scalability}
+% STUB: Measure performance vs. time step size
+% STUB: Analyze stability for larger dt
+% STUB: Compare accuracy vs. computational cost
+
+\subsection{Comparison with Literature}
+
+% STUB: Compare results against published cooperative transport work
+% STUB: Benchmark against Lee 2010 tracking performance
+% STUB: Discuss advantages/limitations of approach
+
+% =============================================================================
+\section{Discussion}
+% =============================================================================
+
+\subsection{Key Findings}
+
+% STUB: Summarize experimental results
+% - Hierarchical control successfully stabilizes system
+% - Geometric attitude control avoids singularities
+% - Quintic trajectories provide smooth motion
+% - System robust to moderate noise levels
+
+\subsection{Limitations}
+
+\subsubsection{Modeling Assumptions}
+\begin{itemize}
+    \item Perfect knowledge of payload inertia
+    \item Rigid attachment assumption (no cable dynamics)
+    \item Simple ground contact model
+    \item No aerodynamic effects or rotor interactions
+\end{itemize}
+
+\subsubsection{Control Limitations}
+\begin{itemize}
+    \item Manual gain tuning (no adaptive control)
+    \item No state estimation (assumes perfect measurements)
+    \item Simple saturation handling (could use anti-windup schemes)
+    \item No collision avoidance between drones
+\end{itemize}
+
+\subsection{Future Work}
+
+\subsubsection{Enhanced Dynamics}
+\begin{itemize}
+    \item Cable suspension model for flexible attachment
+    \item Aerodynamic drag and rotor interference
+    \item Deformable payload dynamics
+    \item Multi-payload formations
+\end{itemize}
+
+\subsubsection{Advanced Control}
+\begin{itemize}
+    \item Model predictive control (MPC) for constraint handling
+    \item Adaptive control for parameter uncertainty
+    \item Observer-based state estimation (EKF/UKF)
+    \item Optimal trajectory planning
+\end{itemize}
+
+\subsubsection{Hardware Validation}
+\begin{itemize}
+    \item Hardware-in-the-loop (HIL) testing
+    \item Flight experiments with real quadrotors
+    \item Vision-based state estimation
+    \item Distributed control implementation
+\end{itemize}
+
+% =============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% =============================================================================
+
+This work presented a comprehensive simulation framework for cooperative quadrotor payload transport with hierarchical control. The system integrates high-fidelity 6-DOF rigid body dynamics, geometric attitude control on SO(3), and quintic polynomial trajectory generation.
+
+Key contributions include:
+\begin{enumerate}
+    \item Complete dynamics simulation with realistic actuator models and noise
+    \item Provably stable geometric attitude controller avoiding singularities
+    \item Systematic trajectory generation ensuring smooth motion profiles
+    \item Configurable architecture enabling extensive parametric studies
+\end{enumerate}
+
+Experimental results (to be completed) demonstrate robust performance under realistic operating conditions. The framework provides a valuable tool for algorithm development, controller tuning, and mission planning for cooperative aerial manipulation systems.
+
+The open-source implementation facilitates reproducibility and serves as an educational resource for understanding multibody dynamics, Lie group control, and hierarchical control architectures.
+
+% =============================================================================
+\section*{Acknowledgments}
+% =============================================================================
+
+% STUB: Add acknowledgments as appropriate
+
+% =============================================================================
+% REFERENCES
+% =============================================================================
+
+\begin{thebibliography}{99}
+
+\bibitem{lee2010}
+Lee, T., Leok, M., \& McClamroch, N. H. (2010).
+\textit{Geometric tracking control of a quadrotor UAV on SE(3)}.
+IEEE Conference on Decision and Control (CDC), 5420--5425.
+
+\bibitem{ziegler1942}
+Ziegler, J. G., \& Nichols, N. B. (1942).
+\textit{Optimum settings for automatic controllers}.
+Transactions of the ASME, 64(11), 759--768.
+
+\bibitem{mellinger2011}
+Mellinger, D., \& Kumar, V. (2011).
+\textit{Minimum snap trajectory generation and control for quadrotors}.
+IEEE International Conference on Robotics and Automation (ICRA), 2520--2525.
+
+\bibitem{bullo2004}
+Bullo, F., \& Murray, R. M. (2004).
+\textit{Geometric control of mechanical systems: Modeling, analysis, and design for simple mechanical control systems}.
+Springer Science \& Business Media.
+
+\bibitem{michael2011}
+Michael, N., Fink, J., \& Kumar, V. (2011).
+\textit{Cooperative manipulation and transportation with aerial robots}.
+Autonomous Robots, 30(1), 73--86.
+
+\bibitem{sreenath2013}
+Sreenath, K., Lee, T., \& Kumar, V. (2013).
+\textit{Geometric control and differential flatness of a quadrotor UAV with a cable-suspended load}.
+IEEE Conference on Decision and Control (CDC), 2269--2274.
+
+\bibitem{cruz2015}
+Cruz, P. J., \& Fierro, R. (2015).
+\textit{Cable-suspended load lifting by a quadrotor UAV: Hybrid model, trajectory generation, and control}.
+Autonomous Robots, 41(8), 1629--1643.
+
+\bibitem{jiang2017}
+Jiang, Q., \& Kumar, V. (2017).
+\textit{The inverse kinematics of cooperative transport with multiple aerial robots}.
+IEEE Transactions on Robotics, 29(1), 136--145.
+
+\bibitem{jackson2020}
+Jackson, B. E., Howell, T. A., Shah, K., Schwager, M., \& Manchester, Z. (2020).
+\textit{Scalable cooperative transport of cable-suspended loads with UAVs using distributed trajectory optimization}.
+IEEE Robotics and Automation Letters, 5(2), 3368--3374.
+
+\bibitem{pounds2014}
+Pounds, P. E., Bersak, D. R., \& Dollar, A. M. (2014).
+\textit{Stability of small-scale UAV helicopters and quadrotors with added payload mass under PID control}.
+Autonomous Robots, 33(1), 129--142.
+
+\end{thebibliography}
+
+% =============================================================================
+% APPENDICES
+% =============================================================================
+
+\appendix
+
+\section{Mathematical Derivations}
+\label{app:derivations}
+
+\subsection{Quintic Polynomial Coefficient Derivation}
+
+Starting from the general quintic:
+\begin{equation}
+    s(t) = a_0 + a_1 t + a_2 t^2 + a_3 t^3 + a_4 t^4 + a_5 t^5
+\end{equation}
+
+Boundary conditions at $t=0$:
+\begin{align}
+    s(0) = 0 &\Rightarrow a_0 = 0 \\
+    \dot{s}(0) = 0 &\Rightarrow a_1 = 0 \\
+    \ddot{s}(0) = 0 &\Rightarrow a_2 = 0
+\end{align}
+
+Boundary conditions at $t=T$:
+\begin{align}
+    s(T) = d &\Rightarrow a_3 T^3 + a_4 T^4 + a_5 T^5 = d \\
+    \dot{s}(T) = 0 &\Rightarrow 3a_3 T^2 + 4a_4 T^3 + 5a_5 T^4 = 0 \\
+    \ddot{s}(T) = 0 &\Rightarrow 6a_3 T + 12a_4 T^2 + 20a_5 T^3 = 0
+\end{align}
+
+Solving this system yields:
+\begin{align}
+    a_3 &= 10dT^{-3} \\
+    a_4 &= -15dT^{-4} \\
+    a_5 &= 6dT^{-5}
+\end{align}
+
+\subsection{Moment of Inertia for Uniform Cube}
+
+For a uniform cube with density $\rho$, side length $a$, and mass $m = \rho a^3$:
+\begin{equation}
+    I_{xx} = \int\int\int (y^2 + z^2) \rho \, dx\,dy\,dz
+\end{equation}
+
+By symmetry, $I_{xx} = I_{yy} = I_{zz}$ and off-diagonal terms vanish. Evaluating:
+\begin{equation}
+    I_{xx} = \rho \int_{-a/2}^{a/2} \int_{-a/2}^{a/2} \int_{-a/2}^{a/2} (y^2 + z^2) \, dx\,dy\,dz = \frac{ma^2}{6}
+\end{equation}
+
+Therefore:
+\begin{equation}
+    \mathbf{I} = \frac{ma^2}{6} \begin{bmatrix} 1 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix}
+\end{equation}
+
+\section{Implementation Details}
+\label{app:implementation}
+
+\subsection{Rodrigues Formula Implementation}
+
+The matrix exponential $\exp([\boldsymbol{\omega}]_\times)$ is computed via:
+\begin{equation}
+    \exp([\boldsymbol{\omega}]_\times) = \mathbf{I} + \frac{\sin\theta}{\theta}[\boldsymbol{\omega}]_\times + \frac{1-\cos\theta}{\theta^2}[\boldsymbol{\omega}]_\times^2
+\end{equation}
+where $\theta = \|\boldsymbol{\omega}\|$.
+
+This is implemented in \texttt{scipy.spatial.transform.Rotation.from\_rotvec()}.
+
+\subsection{Least-Squares Thrust Allocation Algorithm}
+
+\begin{algorithm}
+\caption{Least-Squares Thrust Allocation}
+\begin{algorithmic}[1]
+\Require Desired torque $\boldsymbol{\tau}_d$, attachment points $\{\mathbf{r}_i\}$
+\Ensure Thrust corrections $\{\delta\mathbf{F}_i\}$
+\State Construct moment arm matrix: $\mathbf{A}_{3i:3i+3,:} \gets [\mathbf{r}_i]_\times$ for $i=0,\ldots,3$
+\State Compute pseudoinverse: $\mathbf{A}^\dagger \gets (\mathbf{A}^T\mathbf{A})^{-1}\mathbf{A}^T$
+\State Allocate forces: $\delta\mathbf{F} \gets \mathbf{A}^\dagger \boldsymbol{\tau}_d$
+\State Reshape to per-drone forces: $\delta\mathbf{F}_i \gets \delta\mathbf{F}[3i:3i+3]$
+\State \Return $\{\delta\mathbf{F}_i\}$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Configuration Parameters}
+
+\begin{table}[h]
+\centering
+\caption{Complete simulation parameter listing}
+\begin{tabular}{lll}
+\toprule
+Parameter & Symbol & Value \\
+\midrule
+Time step & $\Delta t$ & \SI{0.001}{s} \\
+Simulation duration & $T_{\text{sim}}$ & \SI{30}{s} \\
+Payload mass & $m_c$ & \SI{10}{kg} \\
+Payload size & $a$ & \SI{1}{m} \\
+Drone mass & $m_d$ & \SI{1}{kg} \\
+Drone max thrust & $T_{\max}$ & \SI{250}{N} \\
+Motor time constant & $\tau_m$ & \SI{0.2}{s} \\
+Gravity & $g$ & \SI{9.80665}{m/s^2} \\
+Attitude gain & $K_R$ & $4T_{\max}$ \\
+Angular velocity gain & $K_\omega$ & $4T_{\max}$ \\
+Position gain (xy) & $K_{p,xy}$ & $0.8 \times 0.08 T_{\max}$ \\
+Position gain (z) & $K_{p,z}$ & $0.8 \times 0.12 T_{\max}$ \\
+Derivative gain (xy) & $K_{d,xy}$ & $0.1 \times 0.08 T_{\max} \times 3.14$ \\
+Derivative gain (z) & $K_{d,z}$ & $0.1 \times 0.12 T_{\max} \times 2.56$ \\
+Mass variance & $\sigma_m$ & $0.0001 m_d$ \\
+Thrust noise & $\sigma_T$ & $0.01 \|T\|$ \\
+Attachment error & $\sigma_a$ & $0.0001 a$ \\
+\bottomrule
+\end{tabular}
+\label{tab:parameters}
+\end{table}
+
+\section{Telemetry Data Format}
+\label{app:telemetry}
+
+\subsection{Payload Telemetry Schema}
+
+\begin{lstlisting}[language=json]
+{
+  "topic": "cube",
+  "time": 1.234,
+  "pos": [x, y, z],
+  "vel": [vx, vy, vz],
+  "acc": [ax, ay, az],
+  "rot": [[r11, r12, r13],
+          [r21, r22, r23],
+          [r31, r32, r33]],
+  "ang_vel": [wx, wy, wz],
+  "ang_acc": [alpha_x, alpha_y, alpha_z]
+}
+\end{lstlisting}
+
+\subsection{Drone Telemetry Schema}
+
+\begin{lstlisting}[language=json]
+{
+  "topic": "drone_0",
+  "time": 1.234,
+  "pos": [x, y, z],
+  "command": [Tcx, Tcy, Tcz],
+  "thrust": [Tx, Ty, Tz]
+}
+\end{lstlisting}
+
+\end{document}

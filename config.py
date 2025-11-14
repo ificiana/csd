@@ -28,9 +28,8 @@ ENABLE_PROFILING = True  # Enable cProfile performance profiling
 # ============================================================================
 # SIMULATION TIMING
 # ============================================================================
-TIME_STEP = 0.001  # Simulation time step in seconds
-SIM_DURATION = 30  # Total simulation duration in seconds
-T = SIM_DURATION  # Alias for backward compatibility
+TIME_STEP = 0.01  # Simulation time step in seconds
+SIM_DURATION = 45  # Total simulation duration in seconds
 
 # ============================================================================
 # SIMULATION PERFORMANCE
@@ -46,18 +45,19 @@ G_ACCELERATION = -9.80665  # Gravity acceleration (m/s²)
 # PAYLOAD (CUBE) PARAMETERS
 # ============================================================================
 CUBE_MASS = 10  # kg
-CUBE_SIZE = 1  # meters
+CUBE_SIZE = 0.25  # meters
 
 # ============================================================================
 # DRONE PARAMETERS (base values)
+# DJI Matrice 300 RTK specs used as reference
 # ============================================================================
-DRONE_MASS = 1  # kg (base mass, subject to random variation)
-DRONE_MAX_THRUST = 250  # N
+DRONE_MASS = 6.3  # kg (base mass, subject to random variation)
+DRONE_MAX_THRUST = 9 * -G_ACCELERATION / 0.7  # N
 DRONE_TIME_CONSTANT = 0.2  # Motor response time constant (seconds)
 
 # Noise parameters
-DRONE_MASS_VARIANCE_AMOUNT = 0.0001  # Mass variation coefficient
-DRONE_THRUST_NOISE_AMOUNT = 0.01  # 1% thrust magnitude noise
+DRONE_MASS_VARIANCE_AMOUNT = 0.02  # Mass variation coefficient (2%)
+DRONE_THRUST_NOISE_AMOUNT = 0.05  # 1% thrust magnitude noise
 
 # Conditional noise values (set to 0 if disabled)
 DRONE_MASS_VARIANCE = DRONE_MASS_VARIANCE_AMOUNT if ENABLE_DRONE_MASS_VARIANCE else 0.0
@@ -67,10 +67,12 @@ DRONE_THRUST_NOISE = DRONE_THRUST_NOISE_AMOUNT if ENABLE_DRONE_THRUST_NOISE else
 # ATTACHMENT ERROR
 # ============================================================================
 ATTACHMENT_ERROR_SEED = 0  # Random seed for attachment position error
-ATTACHMENT_ERROR_SCALE_AMOUNT = 0.0001  # Error scale relative to payload size
+ATTACHMENT_ERROR_SCALE_AMOUNT = 0.01  # Error scale relative to payload size (1%)
 
 # Conditional attachment error (set to 0 if disabled)
-ATTACHMENT_ERROR_SCALE = ATTACHMENT_ERROR_SCALE_AMOUNT if ENABLE_ATTACHMENT_ERROR else 0.0
+ATTACHMENT_ERROR_SCALE = (
+    ATTACHMENT_ERROR_SCALE_AMOUNT if ENABLE_ATTACHMENT_ERROR else 0.0
+)
 
 # ============================================================================
 # TRAJECTORY WAYPOINTS
@@ -93,9 +95,9 @@ KW_AMOUNT = 4.0  # Angular velocity error gain
 
 # Position controller gains (Ziegler-Nichols tuned)
 KU_XY = 0.08 * DRONE_MAX_THRUST  # Ultimate gain for X/Y axes
-TU_XY = 3.14  # Ultimate period for X/Y axes
+TU_XY = 3.5  # Ultimate period for X/Y axes
 KU_Z = 0.12 * DRONE_MAX_THRUST  # Ultimate gain for Z axis
-TU_Z = 2.56  # Ultimate period for Z axis
+TU_Z = 3.5  # Ultimate period for Z axis
 
 # PID gain amounts (computed from Ziegler-Nichols parameters)
 KP_AMOUNT = np.diag([0.8 * KU_XY, 0.8 * KU_XY, 0.8 * KU_Z])
@@ -157,4 +159,4 @@ SENSOR_CHANNELS = [
 ]
 
 MMAP_SIZE = 4096  # Initial memory-mapped file size (bytes)
-POLLING_RATE = 50  # Hz - telemetry polling frequency
+POLLING_RATE = 500  # Hz - telemetry polling frequency

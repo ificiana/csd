@@ -8,7 +8,7 @@ to help diagnose controller performance and detect limit cycles.
 
 class DOFOscillationTracker:
     """Tracks oscillation characteristics across multiple degrees of freedom."""
-    
+
     def __init__(self):
         self.data = {}
 

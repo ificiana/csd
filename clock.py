@@ -10,9 +10,9 @@ Theory:
     For numerical integration of differential equations, fixed time-stepping
     provides consistent behavior across runs and simplifies the implementation
     of explicit integration schemes (e.g., forward Euler):
-    
+
         x(t + dt) = x(t) + dx/dt * dt
-    
+
     where dt = TIME_STEP is constant throughout the simulation.
 """
 
