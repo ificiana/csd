@@ -32,10 +32,10 @@ MX = np.array(
     ]
 )
 
-KR = np.diag([8.0] * 3)
-KW = np.diag([1.5] * 3)
-KI = np.diag([0.1] * 3)
 
+# Attitude control gains
+kR = 100.0
+kW = 100.0
 
 # Ziegler-Nichols tuned position controller gains
 Kuxy = 4
@@ -172,19 +172,6 @@ class ThrustController:
             case 6:
                 return np.array([0.0, 0.0, 0.0])
 
-    def attitude_control(self):
-        R = self.payload.orientation.as_matrix()
-        Rd = np.eye(3)
-        eR = vee(0.5 * (Rd.T @ R - R.T @ Rd))
-        ew = self.payload.omega - R.T @ Rd @ np.zeros(3)
-
-        self.int_eR = self.int_eR + eR * TIME_STEP
-        tau = -KR @ eR - KW @ ew - KI @ self.int_eR
-
-        # shapes
-        # print("Ac", eR.shape, ew.shape, self.int_eR.shape, tau.shape)
-        return tau
-
     def position_control(self):
         # use reference position and velocity to compute desired force
         pos = self.payload.pos
@@ -202,15 +189,74 @@ class ThrustController:
         # print("X", e_pos.shape, e_vel.shape, a_des.shape, F_des.shape)
         return F_des
 
-    def attitude_update(self):
-        tau = self.attitude_control()
-        arm_len = np.sqrt(3 * self.payload.h**2)
-        d_rot = np.tile(tau / arm_len, (3, 1))
-        # make 4x3  matrix
-        dT = -MX @ d_rot
-        # print(f"Attitude Control Torque: {tau}, dT: {dT}")
+    def attitude_control(self):
+        """
+        Simplest Lee 2010 geometric attitude controller (returns per-drone thrusts).
+        No weighting, no robust terms, no nullspace shaping, no smoothing.
+        Just:
+            τ = -kR * eR - kW * eW + ω × (I ω)
+        And:
+            solve min ||A x - b||²
+        to get 4×3 forces that realize torque.
+        """
+        # ----------------------------------------------------
+        # 1) Simple Lee SO(3) Attitude Torque
+        # ----------------------------------------------------
+        R = self.payload.orientation.as_matrix()
+        Rd = np.eye(3)                 # keep level
+        omega = self.payload.omega
+        omega_d = np.zeros(3)
 
-        # print("Au", tau.shape, d_rot.shape, dT.shape)
+        # SO(3) attitude error
+        eR = vee(0.5 * (Rd.T @ R - R.T @ Rd))
+
+        # angular velocity error
+        eW = omega - R.T @ Rd @ omega_d
+
+        # Lee torque law
+        tau = -kR * eR - kW * eW + np.cross(omega, self.payload.moi @ omega)
+        # tau is (3,)
+
+        # ----------------------------------------------------
+        # 2) Minimal Torque → 4×3 Force Allocation (LSQ)
+        # ----------------------------------------------------
+        # drone connection points on payload top face
+        r = float(self.payload.h)
+        r_vectors = np.array([
+            [ r, r, r],   # drone 0
+            [ r, -r, r],  # drone 1
+            [-r, r, r],   # drone 2
+            [ -r, -r, r],  # drone 3
+        ])
+
+        # Build A (6×12) mapping:
+        # [ sum f_i ; sum r_i × f_i ]  = A * x
+        A = np.zeros((6, 12))
+        for i, ri in enumerate(r_vectors):
+            col = 3 * i
+            # force contribution
+            A[0:3, col:col+3] = np.eye(3)
+            # torque contribution
+            A[3:6, col:col+3] = np.array([
+                [0, -ri[2],  ri[1]],
+                [ri[2],  0, -ri[0]],
+                [-ri[1], ri[0], 0]
+            ])
+
+        # desired: zero net force, produce torque = tau
+        b = np.concatenate([np.zeros(3), tau])
+
+        # minimal-norm LSQ solve (no weighting)
+        try:
+            x, *_ = np.linalg.lstsq(A, b, rcond=None)
+        except Exception:
+            x = np.zeros(12)
+
+        dT = x.reshape(4, 3)
+
+        # remove residual net force: enforce Σf = 0 exactly
+        dT -= dT.mean(axis=0)
+
         return dT
 
     def update(self):
@@ -321,12 +367,9 @@ class ThrustController:
 
         # --- Apply net thrust to drones ---
         F = self.mass * np.array([a_x, a_y, a_z])
-
-        # dT = self.attitude_update()
-        dT = np.zeros((4, 3))
+        dT = self.attitude_control()
         dF = self.position_control()
 
-        # dF = np.zeros(3)
         # print(F, dF, dT.sum(axis=0))
         # limit combined control inputs to max available thrust
         total_control = np.linalg.norm(dF + dT.sum(axis=0))
@@ -360,18 +403,19 @@ class ThrustController:
         #     end="\r",
         # )
 
-        if self.phase > 7:
-            e_info = self.tracker.get_info("D")
+        if self.phase > -1:
+            e_info = self.tracker.get_info("Roll")
             
             # clear line
             # print(" " * 150, end="\r")
             print(
                 f"[{t:.2f}s] Payload COM Position: "
-                f"N={pos[1]:.3f}, E={pos[0]:.3f}, D={-pos[2]:.3f} | "
-                f"max={e_info['max']:.3f} at {e_info['t_max']:.2f}s, "
-                f"min={e_info['min']:.3f} at {e_info['t_min']:.2f}s | "
+                # f"N={pos[1]:.3f}, E={pos[0]:.3f}, D={-pos[2]:.3f} | "
+                f"Y={yaw:.1f}, P={pitch:.1f}, R={roll:.1f} | "
+                f"max={e_info['max']:.1f} at {e_info['t_max']:.2f}s, "
+                f"min={e_info['min']:.1f} at {e_info['t_min']:.2f}s | "
                 f"period={e_info['period']:.2f}s",
-                f"aplitude={e_info['current_amplitude']:.3f}",
+                f"aplitude={e_info['current_amplitude']:.1f}",
                 end="\r",
             )
 

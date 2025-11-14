@@ -108,6 +108,7 @@ print(payload.mass)
 np.random.seed(0)
 # 0.01% of size
 err_att = np.random.normal(0, 0.0001 * payload.size, (4, 3))
+# err_att = np.zeros((4, 3))
 controller = ThrustController(payload=payload, drones=drones)
 
 

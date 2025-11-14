@@ -32,11 +32,16 @@ class Drone(Entity):
         # error between commanded and current thrust
         e = self.t_c - self.thrust
         self.thrust += e * dt
+        
+        mag = np.linalg.norm(self.thrust)
 
-        self.thrust += np.random.normal(0, 0.01, 3)  # add small noise
+        # small magnitude noise, same direction as thrust
+        # 1%
+        if mag > 1e-6:
+            noise = np.random.normal(0, 0.01 * mag, 3)
+            self.thrust += noise
 
         # enforce maximum magnitude limit
-        mag = np.linalg.norm(self.thrust)
         if mag > self.max_thrust:
             self.thrust *= self.max_thrust / mag
 
