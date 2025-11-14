@@ -122,6 +122,8 @@ class Cube(Entity):
         bottom_min_idx = np.argmin(B)
         penetration = B[bottom_min_idx]
         if penetration < 0:
+            if np.linalg.norm(self.vel) > 0.01:
+                print(f"Ground Hit- Impact Velocity: {np.linalg.norm(self.vel):.2f} m/s \n")
             self.pos -= [0, 0, penetration]
             self.alpha = np.zeros(3)
             self.acc = np.zeros(3)

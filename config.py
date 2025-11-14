@@ -52,7 +52,7 @@ CUBE_SIZE = 1  # meters
 # DRONE PARAMETERS (base values)
 # ============================================================================
 DRONE_MASS = 1  # kg (base mass, subject to random variation)
-DRONE_MAX_THRUST = 200  # N
+DRONE_MAX_THRUST = 250  # N
 DRONE_TIME_CONSTANT = 0.2  # Motor response time constant (seconds)
 
 # Noise parameters
