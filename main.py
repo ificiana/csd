@@ -4,18 +4,28 @@ import time
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-from clock import TIME_STEP, T, get_time, time_tick
+from clock import TIME_STEP, get_time, time_tick
+from config import (
+    ATTACHMENT_ERROR_SCALE,
+    ATTACHMENT_ERROR_SEED,
+    ATTACHMENT_POINTS,
+    CUBE_MASS,
+    CUBE_SIZE,
+    G_ACCELERATION,
+    SIM_DURATION,
+    TIME_SCALE_FACTOR,
+)
 from controller import ThrustController
 from drone import Drone
 from entity import Entity
 from utils import cross, vec3
 
-G = vec3(0, 0, -9.80665)
+G = vec3(0, 0, G_ACCELERATION)
 
 
 class Cube(Entity):
-    mass = 10
-    size = 1
+    mass = CUBE_MASS
+    size = CUBE_SIZE
     h = size / 2
 
     def __init__(self, pos: vec3, topic: str = "cube") -> None:
@@ -29,13 +39,13 @@ class Cube(Entity):
         self.vel = np.zeros(3)
 
     @property
-    def corners(self):
+    def top(self):
         return (
             self.orientation.apply(
                 np.array(
                     [
                         vec3(a * self.h, b * self.h, self.h)
-                        for (a, b) in [(1, 1), (1, -1), (-1, 1), (-1, -1)]
+                        for (a, b) in ATTACHMENT_POINTS
                     ]
                 )
             )
@@ -49,7 +59,7 @@ class Cube(Entity):
                 np.array(
                     [
                         vec3(a * self.h, b * self.h, -self.h)
-                        for (a, b) in [(1, 1), (1, -1), (-1, 1), (-1, -1)]
+                        for (a, b) in ATTACHMENT_POINTS
                     ]
                 )
             )
@@ -105,10 +115,8 @@ ds_mass = sum(d.mass for d in drones)
 payload = Cube(vec3(0, 0, 0))
 print(payload.mass)
 
-np.random.seed(0)
-# 0.01% of size
-err_att = np.random.normal(0, 0.0001 * payload.size, (4, 3))
-# err_att = np.zeros((4, 3))
+np.random.seed(ATTACHMENT_ERROR_SEED)
+err_att = np.random.normal(0, ATTACHMENT_ERROR_SCALE * payload.size, (4, 3))
 controller = ThrustController(payload=payload, drones=drones)
 
 
@@ -122,7 +130,7 @@ def tick():
 
     torques = []
     forces = []
-    for r, d in zip(payload.corners + err_att, drones):
+    for r, d in zip(payload.top + err_att, drones):
         d.pos = r.copy()
         r -= payload.pos
         f = vec3(d.thrust + d.mass * G)
@@ -146,11 +154,11 @@ def main():
         s = time.time_ns()
         tick()
         t = time.time_ns()
-        e = (t - s) / 1e9 / 0.7
+        e = (t - s) / 1e9 / TIME_SCALE_FACTOR
         # time.sleep(max(0.0, TIME_STEP - e))
 
         # run for T seconds
-        if get_time() >= T:
+        if get_time() >= SIM_DURATION:
             return
 
 

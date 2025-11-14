@@ -1,16 +1,9 @@
 import time
 
+from config import POLLING_RATE, SENSOR_CHANNELS
 from tel import MMapJSON
 
 DEL = True
-
-SENSOR_CHANNELS = [
-    "cube",
-    "drone_0",
-    "drone_1",
-    "drone_2",
-    "drone_3",
-]
 
 DAT = MMapJSON(f"data/{int(time.time())}.mmap", file=True)
 sensors = {name: MMapJSON(f"channel/{name}") for name in SENSOR_CHANNELS}
@@ -38,8 +31,6 @@ data = {
         "ang_vel": {},
     },
 }
-
-POLLING_RATE = 50
 
 while True:
     for name, reader in sensors.items():

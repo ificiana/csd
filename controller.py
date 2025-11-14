@@ -3,65 +3,43 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from clock import TIME_STEP, get_time
+from config import ATTACHMENT_POINTS, EAST
+from config import G_ACCELERATION as G
+from config import (
+    HEIGHT,
+    HOVER_TIMES,
+    KD,
+    KI_POS,
+    KP,
+    KR,
+    KW,
+    MAX_TAKEOFF_FRACTION,
+    MAX_TRANSL_FRACTION,
+    NORTH,
+    POSITION_TOLERANCE,
+)
 from drone import Drone
 from tune import DOFOscillationTracker
+from utils import vee
 
 if TYPE_CHECKING:
     from main import Cube
 
-HEIGHT = 5
-EAST = 10
-NORTH = 10
-
-
-def vee(S):
-    return np.array([S[2, 1], S[0, 2], S[1, 0]])
-
-
-# 4x3 thrust mixing matrix
-# + + +
-# - + -
-# - - +
-# + - -
-MX = np.array(
-    [
-        [1, 1, 1],
-        [-1, 1, -1],
-        [-1, -1, 1],
-        [1, -1, -1],
-    ]
-)
-
-
-# Attitude control gains
-kR = 100.0
-kW = 100.0
-
-# Ziegler-Nichols tuned position controller gains
-Kuxy = 4
-Tuxy = 3.14
-Kuz = 6
-Tuz = 2.56
-
-KP = np.diag([0.8 * Kuxy, 0.8 * Kuxy, 0.8 * Kuz])
-KI_POS = np.diag([0 * Kuxy / Tuxy, 0 * Kuxy / Tuxy, 0 * Kuz / Tuz])
-KD = np.diag([0.1 * Kuxy * Tuxy, 0.1 * Kuxy * Tuxy, 0.1 * Kuz * Tuz])
 
 class ThrustController:
     def __init__(self, drones: list[Drone], payload: "Cube") -> None:
         self.drones = drones
         self.payload = payload
-        self.g = -9.80665
         self.mass = self.payload.mass + sum(d.mass for d in self.drones)
 
         # takeoff power setup (vertical)
         max_thrust = drones[0].max_thrust * 4
-        self.max_takeoff = 0.75 * max_thrust
-        self.max_takeoff_acc = self.max_takeoff / self.mass + self.g
+        self.max_takeoff = MAX_TAKEOFF_FRACTION * max_thrust
+        self.max_takeoff_acc = self.max_takeoff / self.mass + G
         self.z_coeff = np.sqrt(3 * HEIGHT * self.max_takeoff_acc / (10 * np.sqrt(3)))
 
         residual_thrust = max_thrust - self.max_takeoff
-        self.max_transl = residual_thrust * 0.33
+        self.max_transl = residual_thrust * MAX_TRANSL_FRACTION
         self.max_transl_acc = self.max_transl / self.mass
 
         self.max_control = residual_thrust - self.max_transl
@@ -87,10 +65,10 @@ class ThrustController:
         # --- trajectory phase control ---
         self.phase = 0
         self.t0 = get_time()
-        self.hover_times = [2.0, 2.0, 10.0]  # t1, t2, t3 hover durations
+        self.hover_times = HOVER_TIMES
 
         # tolerance for positional comparisons
-        self.tol = 1e-6
+        self.tol = POSITION_TOLERANCE
 
         # Attitude control integrator state
         self.int_eR = np.zeros(3)
@@ -179,7 +157,7 @@ class ThrustController:
         pos_ref = self.reference_pos()
         vel_ref = self.reference_vel()
         e_pos = pos_ref - pos
-        e_vel = vel_ref - vel # type: ignore
+        e_vel = vel_ref - vel  # type: ignore
 
         self.int_eX = self.int_eX + e_pos * TIME_STEP
         a_des = KP @ e_pos + KD @ e_vel + KI_POS @ self.int_eX
@@ -203,7 +181,7 @@ class ThrustController:
         # 1) Simple Lee SO(3) Attitude Torque
         # ----------------------------------------------------
         R = self.payload.orientation.as_matrix()
-        Rd = np.eye(3)                 # keep level
+        Rd = np.eye(3)  # keep level
         omega = self.payload.omega
         omega_d = np.zeros(3)
 
@@ -214,7 +192,7 @@ class ThrustController:
         eW = omega - R.T @ Rd @ omega_d
 
         # Lee torque law
-        tau = -kR * eR - kW * eW + np.cross(omega, self.payload.moi @ omega)
+        tau = -KR * eR - KW * eW + np.cross(omega, self.payload.moi @ omega)
         # tau is (3,)
 
         # ----------------------------------------------------
@@ -222,12 +200,7 @@ class ThrustController:
         # ----------------------------------------------------
         # drone connection points on payload top face
         r = float(self.payload.h)
-        r_vectors = np.array([
-            [ r, r, r],   # drone 0
-            [ r, -r, r],  # drone 1
-            [-r, r, r],   # drone 2
-            [ -r, -r, r],  # drone 3
-        ])
+        r_vectors = np.array([[a * r, b * r, r] for (a, b) in ATTACHMENT_POINTS])
 
         # Build A (6×12) mapping:
         # [ sum f_i ; sum r_i × f_i ]  = A * x
@@ -235,13 +208,11 @@ class ThrustController:
         for i, ri in enumerate(r_vectors):
             col = 3 * i
             # force contribution
-            A[0:3, col:col+3] = np.eye(3)
+            A[0:3, col : col + 3] = np.eye(3)
             # torque contribution
-            A[3:6, col:col+3] = np.array([
-                [0, -ri[2],  ri[1]],
-                [ri[2],  0, -ri[0]],
-                [-ri[1], ri[0], 0]
-            ])
+            A[3:6, col : col + 3] = np.array(
+                [[0, -ri[2], ri[1]], [ri[2], 0, -ri[0]], [-ri[1], ri[0], 0]]
+            )
 
         # desired: zero net force, produce torque = tau
         b = np.concatenate([np.zeros(3), tau])
@@ -268,9 +239,9 @@ class ThrustController:
         # 0: Takeoff
         if self.phase == 0:
             if pos[2] < H:
-                a_z = self.accel_poly(self.z_coeff, HEIGHT, t_global) - self.g
+                a_z = self.accel_poly(self.z_coeff, HEIGHT, t_global) - G
             else:
-                a_z = -self.g
+                a_z = -G
                 self.phase = 1
                 self.t0 = get_time()  # reset timer
                 print("\nReached height:", HEIGHT)
@@ -283,7 +254,7 @@ class ThrustController:
                 self.t0 = get_time()
                 print("\nHover complete, moving East")
             a_x = a_y = 0.0
-            a_z = -self.g
+            a_z = -G
 
         # 2: Move East (handles positive or negative EAST)
         elif self.phase == 2:
@@ -302,13 +273,13 @@ class ThrustController:
                 self.phase = 3
                 self.t0 = get_time()
                 a_x = a_y = 0.0
-                a_z = -self.g
+                a_z = -G
                 print("\nReached East:", EAST)
             else:
                 # accelerate in direction dir_e using travel distance (abs)
                 a_x = dir_e * self.accel_poly(self.x_coeff, self.travel_e, t_global)
                 a_y = 0.0
-                a_z = -self.g
+                a_z = -G
 
         # 3: Hover East
         elif self.phase == 3:
@@ -317,7 +288,7 @@ class ThrustController:
                 self.t0 = get_time()
                 print("\nHover complete, moving North")
             a_x = a_y = 0.0
-            a_z = -self.g
+            a_z = -G
 
         # 4: Move North (handles positive or negative NORTH)
         elif self.phase == 4:
@@ -333,12 +304,12 @@ class ThrustController:
                 self.phase = 5
                 self.t0 = get_time()
                 a_x = a_y = 0.0
-                a_z = -self.g
+                a_z = -G
                 print("\nReached North:", NORTH)
             else:
                 a_x = 0.0
                 a_y = dir_n * self.accel_poly(self.y_coeff, self.travel_n, t_global)
-                a_z = -self.g
+                a_z = -G
 
         # 5: Hover North
         elif self.phase == 5:
@@ -347,7 +318,7 @@ class ThrustController:
             #     self.t0 = get_time()
             #     print("\nHover complete, landing")
             a_x = a_y = 0.0
-            a_z = -self.g
+            a_z = -G
 
         # 6: Free fall :)
         elif self.phase == 6:
@@ -405,7 +376,7 @@ class ThrustController:
 
         if self.phase > -1:
             e_info = self.tracker.get_info("Roll")
-            
+
             # clear line
             # print(" " * 150, end="\r")
             print(

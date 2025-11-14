@@ -1,20 +1,22 @@
 import numpy as np
 
 from clock import TIME_STEP
+from config import (
+    DRONE_MASS,
+    DRONE_MASS_VARIANCE,
+    DRONE_MAX_THRUST,
+    DRONE_THRUST_NOISE,
+    DRONE_TIME_CONSTANT,
+)
 from entity import Entity
 
-# time constant for response (seconds)
-# higher = slower response; lower = faster, closer to instantaneous
-# 200 ms is a reasonable approximation for small electric motors
-tau = 0.2
-
 # compute incremental change (first-order lag toward target)
-dt = np.clip(TIME_STEP / max(tau, 1e-6), 0.0, 1.0)
+dt = np.clip(TIME_STEP / max(DRONE_TIME_CONSTANT, 1e-6), 0.0, 1.0)
 
 
 class Drone(Entity):
-    mass = 1
-    max_thrust = 50
+    mass = DRONE_MASS
+    max_thrust = DRONE_MAX_THRUST
 
     def __init__(self, index: int) -> None:
         super().__init__(f"drone_{index}")
@@ -23,7 +25,7 @@ class Drone(Entity):
         self.t_c = np.zeros(3)
 
         np.random.seed(1 + index)
-        self.mass = self.mass + np.random.normal(0, self.mass * 0.0001)
+        self.mass = self.mass + np.random.normal(0, self.mass * DRONE_MASS_VARIANCE)
 
     def set_thrust(self, x=0.0, y=0.0, z=0.0):
         # desired (commanded) thrust vector
@@ -32,13 +34,12 @@ class Drone(Entity):
         # error between commanded and current thrust
         e = self.t_c - self.thrust
         self.thrust += e * dt
-        
+
         mag = np.linalg.norm(self.thrust)
 
         # small magnitude noise, same direction as thrust
-        # 1%
         if mag > 1e-6:
-            noise = np.random.normal(0, 0.01 * mag, 3)
+            noise = np.random.normal(0, DRONE_THRUST_NOISE * mag, 3)
             self.thrust += noise
 
         # enforce maximum magnitude limit

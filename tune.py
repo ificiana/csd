@@ -7,17 +7,14 @@ class DOFOscillationTracker:
         self.data[name] = {
             "prev": initial_value,
             "prev_slope": 0,
-
             # Global extreme tracking
             "max": initial_value,
             "min": initial_value,
             "t_max": t,
             "t_min": t,
-
             # Oscillation timing
             "last_peak_time": None,
             "period": 0.0,
-
             # For amplitude tracking
             "last_local_max": initial_value,
             "last_local_min": initial_value,
@@ -48,16 +45,13 @@ class DOFOscillationTracker:
         # Detect zero-crossings of slope → peaks/troughs
         # ---------------------------------------------
         if sign != d["prev_slope"] and d["prev_slope"] != 0:
-
             # Case 1: going + → -  (local maximum)
             if d["prev_slope"] > 0 and sign < 0:
                 # Local maximum at value
                 d["last_local_max"] = value
 
                 # Compute amplitude using last trough
-                d["current_amplitude"] = abs(
-                    d["last_local_max"] - d["last_local_min"]
-                )
+                d["current_amplitude"] = abs(d["last_local_max"] - d["last_local_min"])
 
                 # Update period timing
                 if d["last_peak_time"] is None:
@@ -72,9 +66,7 @@ class DOFOscillationTracker:
                 d["last_local_min"] = value
 
                 # Compute amplitude using last peak
-                d["current_amplitude"] = abs(
-                    d["last_local_max"] - d["last_local_min"]
-                )
+                d["current_amplitude"] = abs(d["last_local_max"] - d["last_local_min"])
 
         # Store current value and slope
         d["prev"] = value

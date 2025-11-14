@@ -2,6 +2,8 @@ import json
 import mmap
 import os
 
+from config import MMAP_SIZE
+
 
 class MMapJSON:
     """
@@ -11,7 +13,7 @@ class MMapJSON:
     Only stores the latest JSON snapshot.
     """
 
-    def __init__(self, path_or_topic: str, size: int = 4096, file: bool = False):
+    def __init__(self, path_or_topic: str, size: int = MMAP_SIZE, file: bool = False):
         """
         Args:
             path_or_topic: Path to mmap file (if file=True) or shared memory topic name (if file=False).
