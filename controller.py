@@ -61,7 +61,7 @@ class ThrustController:
         self.z_coeff = np.sqrt(3 * HEIGHT * self.max_takeoff_acc / (10 * np.sqrt(3)))
 
         residual_thrust = max_thrust - self.max_takeoff
-        self.max_transl = residual_thrust * 0.9
+        self.max_transl = residual_thrust * 0.33
         self.max_transl_acc = self.max_transl / self.mass
 
         self.max_control = residual_thrust - self.max_transl

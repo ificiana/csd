@@ -146,7 +146,7 @@ def main():
         tick()
         t = time.time_ns()
         e = (t - s) / 1e9 / 0.7
-        time.sleep(max(0.0, TIME_STEP - e))
+        # time.sleep(max(0.0, TIME_STEP - e))
 
         # run for T seconds
         if get_time() >= T:

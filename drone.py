@@ -5,7 +5,8 @@ from entity import Entity
 
 # time constant for response (seconds)
 # higher = slower response; lower = faster, closer to instantaneous
-tau = 1e-7
+# 200 ms is a reasonable approximation for small electric motors
+tau = 0.2
 
 # compute incremental change (first-order lag toward target)
 dt = np.clip(TIME_STEP / max(tau, 1e-6), 0.0, 1.0)
