@@ -23,6 +23,7 @@ from config import TIME_STEP
 SIM_TIME = 0
 START_TIME = time.time_ns()
 STOP_FLAG = False
+PHASE = 0
 
 
 def get_time():
@@ -61,3 +62,24 @@ def is_stopped():
         True if simulation has been stopped, False otherwise.
     """
     return STOP_FLAG
+
+
+def get_phase():
+    """
+    Returns the current simulation phase.
+
+    Returns:
+        Current simulation phase as an integer.
+    """
+    return PHASE
+
+
+def set_phase(phase: int):
+    """
+    Sets the current simulation phase.
+
+    Args:
+        phase: New simulation phase as an integer.
+    """
+    global PHASE
+    PHASE = phase

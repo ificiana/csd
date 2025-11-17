@@ -130,6 +130,7 @@ class Cube(BaseModel):
     vel: dict[float, tuple[float, float, float]]
     ang_acc: dict[float, tuple[float, float, float]]
     ang_vel: dict[float, tuple[float, float, float]]
+    wind: dict[float, tuple[float, float, float]]
 
     @property
     def pos_df(self) -> pd.DataFrame:
@@ -150,6 +151,10 @@ class Cube(BaseModel):
     @property
     def ang_vel_df(self) -> pd.DataFrame:
         return _dict_to_df(self.ang_vel, ["Wx", "Wy", "Wz"])
+
+    @property
+    def wind_df(self) -> pd.DataFrame:
+        return _dict_to_df(self.wind, ["windx", "windy", "windz"])
 
     @property
     def rot_df(self) -> pd.DataFrame:
@@ -181,6 +186,7 @@ class Cube(BaseModel):
                 self.ang_vel_df,
                 self.ang_acc_df,
                 self.rot_df,
+                self.wind_df,
             ],
             axis=1,
         )
@@ -437,6 +443,7 @@ def plot_graphs(data: Data):
             "Angular acceleration (rad/s²)",
         ),
         (["yaw", "pitch", "roll"], "Yaw/Pitch/Roll", False, "Angle (deg)"),
+        (["windx", "windy", "windz"], "Wind velocity", False, "Velocity (m/s)"),
     ]
 
     for cols, title, traj, ylabel in cube_plots:

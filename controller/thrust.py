@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from clock import get_time, is_stopped
+from clock import get_phase, get_time, is_stopped, set_phase
 from config import EAST
 from config import G_ACCELERATION as G
 from config import HEIGHT, MAX_TAKEOFF_FRACTION, MAX_TRANSL_FRACTION, NORTH
@@ -80,7 +80,7 @@ class ThrustController:
         a_x, a_y, a_z = self.planner.get_feedforward_acceleration(pos)
 
         if is_stopped():
-            self.planner.phase = 7  # Force end of trajectory if stopped
+            set_phase(7)  # Force end of trajectory if stopped
 
         feedforward_force = self.mass * np.array([a_x, a_y, a_z])
         thrust_corrections = self.attitude_controller.compute_thrust_corrections()
@@ -143,7 +143,7 @@ class ThrustController:
             6: "LANDING",
             7: "COMPLETE",
         }
-        phase_name = phase_names.get(self.planner.phase, "UNKNOWN")
+        phase_name = phase_names.get(get_phase(), "UNKNOWN")
 
         # Calculate reference errors
         ref_pos = self.planner.get_reference_position()

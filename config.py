@@ -14,13 +14,14 @@ import numpy as np
 # Enable/disable various simulation features for testing and debugging
 
 # Noise switches
-ENABLE_DRONE_MASS_VARIANCE = False  # Add random variance to drone masses
-ENABLE_DRONE_THRUST_NOISE = False  # Add noise to drone thrust outputs
-ENABLE_ATTACHMENT_ERROR = False  # Add error to attachment point positions
+ENABLE_DRONE_MASS_VARIANCE = True  # Add random variance to drone masses
+ENABLE_DRONE_THRUST_NOISE = True  # Add noise to drone thrust outputs
+ENABLE_ATTACHMENT_ERROR = True  # Add error to attachment point positions
+ENABLE_WIND = True  # Enable wind disturbances
 
 # Controller switches
-ENABLE_ATTITUDE_CONTROLLER = False  # Enable geometric attitude control
-ENABLE_POSITION_CONTROLLER = False  # Enable PID position control
+ENABLE_ATTITUDE_CONTROLLER = True  # Enable geometric attitude control
+ENABLE_POSITION_CONTROLLER = True  # Enable PID position control
 
 # Profiling
 ENABLE_PROFILING = True  # Enable cProfile performance profiling
@@ -40,6 +41,7 @@ TIME_SCALE_FACTOR = 0.7  # Real-time scaling factor for simulation speed
 # PHYSICS
 # ============================================================================
 G_ACCELERATION = -9.80665  # Gravity acceleration (m/s²)
+AIR_DENSITY = 1.225  # Air density at sea level (kg/m³)
 
 # ============================================================================
 # PAYLOAD (CUBE) PARAMETERS
@@ -73,6 +75,18 @@ ATTACHMENT_ERROR_SCALE_AMOUNT = 0.01  # Error scale relative to payload size (1%
 ATTACHMENT_ERROR_SCALE = (
     ATTACHMENT_ERROR_SCALE_AMOUNT if ENABLE_ATTACHMENT_ERROR else 0.0
 )
+
+# ============================================================================
+# WIND MODEL
+# ============================================================================
+WIND_SEED = 0  # Random seed for wind turbulence
+WIND_BASELINE_AMOUNT = np.array([0.5, 0.0, 0.0])  # Baseline wind velocity (m/s)
+WIND_GUST_SIGMA_AMOUNT = 0.3  # Gaussian random walk standard deviation (m/s/√s)
+WIND_DRAG_COEFF = 1.0  # Drag coefficient for payload
+
+# Conditional wind parameters (set to 0 if disabled)
+WIND_BASELINE = WIND_BASELINE_AMOUNT if ENABLE_WIND else np.zeros(3)
+WIND_GUST_SIGMA = WIND_GUST_SIGMA_AMOUNT if ENABLE_WIND else 0.0
 
 # ============================================================================
 # TRAJECTORY WAYPOINTS
@@ -176,6 +190,7 @@ PAYLOAD_TELEMETRY_FIELDS = [
     "vel",
     "ang_acc",
     "ang_vel",
+    "wind",
 ]
 
 MMAP_SIZE = 4096  # Initial memory-mapped file size (bytes)

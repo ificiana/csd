@@ -61,7 +61,7 @@ import time
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-from clock import TIME_STEP, get_time, stop, time_tick
+from clock import TIME_STEP, get_phase, get_time, stop, time_tick
 from config import (
     ATTACHMENT_ERROR_SCALE,
     ATTACHMENT_ERROR_SEED,
@@ -72,6 +72,7 @@ from config import (
     DRONE_THRUST_NOISE,
     EAST,
     ENABLE_PROFILING,
+    ENABLE_WIND,
     G_ACCELERATION,
     HEIGHT,
     MAX_TAKEOFF_FRACTION,
@@ -79,10 +80,15 @@ from config import (
     NORTH,
     SIM_DURATION,
     TIME_SCALE_FACTOR,
+    WIND_BASELINE,
+    WIND_DRAG_COEFF,
+    WIND_GUST_SIGMA,
+    WIND_SEED,
 )
 from controller import ThrustController
 from drone import Drone
 from entity import Entity
+from wind import Wind
 
 G = np.array([0, 0, G_ACCELERATION])
 
@@ -168,7 +174,8 @@ class Cube(Entity):
         bottom_min_idx = np.argmin(B)
         penetration = B[bottom_min_idx]
         if penetration < 0:
-            if np.linalg.norm(self.vel) > 0.1:
+            if np.linalg.norm(self.vel) > 0.1 and get_phase() == 6:
+                # only report impact on landing phase
                 print(
                     f"\n[   INFO] Ground Contact - Impact Velocity: {np.linalg.norm(self.vel):.2f} m/s"
                 )
@@ -190,6 +197,7 @@ class Cube(Entity):
         t["vel"] = [*self.vel]
         t["ang_acc"] = [*self.alpha]
         t["ang_vel"] = [*self.omega]
+        t["wind"] = [*wind.get_velocity()]
         return t
 
 
@@ -200,6 +208,8 @@ payload = Cube(np.array([0, 0, 0]))
 np.random.seed(ATTACHMENT_ERROR_SEED)
 attachment_error = np.random.normal(0, ATTACHMENT_ERROR_SCALE * payload.size, (4, 3))
 controller = ThrustController(payload=payload, drones=drones)
+
+wind = Wind(baseline=WIND_BASELINE, gust_sigma=WIND_GUST_SIGMA, seed=WIND_SEED)
 
 
 def print_initialization():
@@ -249,12 +259,25 @@ def print_initialization():
     print(f"  Attachment Error Seed:  {ATTACHMENT_ERROR_SEED}")
     print(f"  Attachment Error Scale: {ATTACHMENT_ERROR_SCALE:.6f}")
     print(f"  Attachment Error RMS:   {np.linalg.norm(attachment_error) / 4:.6f} m")
-    # print thrust noise and mass noise
     print(f"  Thrust Noise:           {DRONE_THRUST_NOISE:.6f} N")
     print(
         f"  Mass Noise RMS:         {np.linalg.norm(drone_total_mass - DRONE_MASS * 4) / 4:.6f} kg"
     )
     print()
+    if ENABLE_WIND:
+        print("WIND MODEL:")
+        print(f"  Enabled:                {ENABLE_WIND}")
+        # print in knots for aviation relevance
+        # print(
+        #     f"  Baseline Wind:          [{WIND_BASELINE[0]:.2f}, {WIND_BASELINE[1]:.2f}, {WIND_BASELINE[2]:.2f}] m/s"
+        # )
+        print(
+            f"  Baseline Wind:          [{WIND_BASELINE[0]*1.94384:.2f}, {WIND_BASELINE[1]*1.94384:.2f}, {WIND_BASELINE[2]*1.94384:.2f}] knots"
+        )
+        print(f"  Gust Intensity (sigma): {WIND_GUST_SIGMA:.2f} ms^-0.5")
+        print(f"  Drag Coefficient:       {WIND_DRAG_COEFF:.2f}")
+        print(f"  Wind Seed:              {WIND_SEED}")
+        print()
     print("=" * 80)
     print("STARTING SIMULATION...")
     print("=" * 80)
@@ -269,6 +292,9 @@ def tick():
     time_tick()
     controller.update()
 
+    wind.update(TIME_STEP)
+    wind_force = wind.get_force(area=payload.size**2, drag_coeff=WIND_DRAG_COEFF)
+
     attachment_points = payload.top + attachment_error
     for d, pos in zip(drones, attachment_points):
         d.pos = pos.copy()
@@ -281,7 +307,7 @@ def tick():
     torques = np.cross(r_vectors, forces)
 
     payload.set_alpha(torques)
-    payload.set_acc(forces)
+    payload.set_acc(forces + wind_force)
     payload.tick()
 
     for d in drones:

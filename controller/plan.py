@@ -17,7 +17,7 @@ Theory:
 
 import numpy as np
 
-from clock import get_time
+from clock import get_phase, get_time, set_phase
 from config import EAST, G_ACCELERATION, HEIGHT, HOVER_TIMES, NORTH, POSITION_TOLERANCE
 from controller import quintic
 
@@ -50,10 +50,14 @@ class TrajectoryPlanner:
         self.travel_e = travel_east
         self.travel_n = travel_north
 
-        self.phase = 0
         self.phase_start_time = get_time()
         self.hover_times = HOVER_TIMES
         self.tolerance = POSITION_TOLERANCE
+
+    @property
+    def phase(self) -> int:
+        """Returns current trajectory phase number."""
+        return get_phase()
 
     def get_reference_position(self) -> np.ndarray:
         """
@@ -213,7 +217,7 @@ class TrajectoryPlanner:
                     print("\n" + "=" * 80)
                     print("PAYLOAD LANDED SUCCESSFULLY!")
                     print("=" * 80)
-                    self.phase = 7
+                    set_phase(7)
                     a_x = a_y = a_z = 0.0
                 else:
                     a_x = a_y = 0.0
@@ -239,6 +243,6 @@ class TrajectoryPlanner:
             message: Format string for status message.
             *args: Arguments for format string.
         """
-        self.phase = new_phase
+        set_phase(new_phase)
         self.phase_start_time = get_time()
         print(f"\n[PHASE {new_phase}] " + message.format(*args))
