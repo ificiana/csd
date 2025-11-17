@@ -94,7 +94,7 @@ This work makes the following contributions:
     \item Hierarchical control architecture combining geometric attitude control on SO(3) with PID position regulation
     \item Multi-phase trajectory planning (7 phases: takeoff, hover, translate, hover, translate, hover, landing) using quintic polynomial profiles ensuring C$^2$ continuity
     \item Realistic DJI Matrice 300 RTK-based drone modeling with accurate mass and thrust specifications
-    \item Realistic noise modeling including 2\% mass variance, 5\% thrust noise, and 1\% attachment point geometric uncertainties
+    \item Realistic noise modeling including 2\% mass variance, 5\% thrust noise, 1\% attachment point errors, and wind disturbances (0.5 m/s baseline with turbulent gusts)
     \item Comprehensive simulation environment with configurable parameters and JSON-based real-time telemetry via memory-mapped files
     \item Live telemetry display with oscillation tracking for all 6 DOF
 \end{enumerate}
@@ -143,18 +143,48 @@ For a uniform cube with mass $m$ and side length $a$:
 \end{equation}
 
 \subsubsection{Orientation Integration}
-The orientation matrix evolves according to:
+
+The orientation matrix evolves according to the kinematic equation
 \begin{equation}
-    \dot{\mathbf{R}} = \mathbf{R}[\boldsymbol{\omega}]_\times
+    \dot{\mathbf{R}} = \mathbf{R}[\boldsymbol{\omega}]_\times,
 \end{equation}
-where $[\cdot]_\times : \mathbb{R}^3 \to \mathfrak{so}(3)$ is the skew-symmetric matrix operator:
+where $[\cdot]_\times : \mathbb{R}^3 \to \mathfrak{so}(3)$ is the skew-symmetric (``hat'') operator:
 \begin{equation}
-    [\mathbf{x}]_\times = \begin{bmatrix}
+    [\mathbf{x}]_\times =
+    \begin{bmatrix}
         0 & -x_3 & x_2 \\
         x_3 & 0 & -x_1 \\
         -x_2 & x_1 & 0
-    \end{bmatrix}
+    \end{bmatrix}.
 \end{equation}
+
+\paragraph{Vee map.}
+The inverse of the hat operator is the \emph{vee} map
+$\vee : \mathfrak{so}(3) \to \mathbb{R}^3$, which extracts the
+angular-velocity vector from a skew-symmetric matrix.
+For a matrix $\mathbf{S} \in \mathfrak{so}(3)$ of the form
+\[
+\mathbf{S} =
+\begin{bmatrix}
+    0 & -s_3 & s_2 \\
+    s_3 & 0 & -s_1 \\
+    -s_2 & s_1 & 0
+\end{bmatrix},
+\]
+the vee operator returns
+\[
+\mathbf{S}^\vee = 
+\begin{bmatrix}
+    s_1 \\ s_2 \\ s_3
+\end{bmatrix}.
+\]
+
+The hat and vee operators form an isomorphism between
+$\mathbb{R}^3$ and the Lie algebra $\mathfrak{so}(3)$:
+\[
+(\mathbf{x}^\wedge)^\vee = \mathbf{x}, \qquad
+(\mathbf{S}^\vee)^\wedge = \mathbf{S}.
+\]
 
 We integrate using the exponential map:
 \begin{equation}
@@ -187,8 +217,8 @@ Key properties:
 The payload is modeled as a rigid cube with:
 \begin{itemize}
     \item Mass: $m_c = \SI{10}{kg}$
-    \item Side length: $a = \SI{1}{m}$
-    \item Moment of inertia: $\mathbf{I} = \frac{10}{6}\mathbf{I}_3 \approx 1.667\mathbf{I}_3$ kg$\cdot$m$^2$
+    \item Side length: $a = \SI{0.25}{m}$
+    \item Moment of inertia: $\mathbf{I} = \frac{10}{6}\mathbf{I}_3 \approx 0.417\mathbf{I}_3$ kg$\cdot$m$^2$ (cube only, see below for system total)
 \end{itemize}
 
 Four attachment points are located at the top corners:
@@ -223,7 +253,7 @@ where $m_d = \sum_{i=0}^{3} m_i^{\text{drone}}$ is total drone mass.
 The simulation uses realistic drone parameters based on the DJI Matrice 300 RTK:
 \begin{itemize}
     \item Base mass: $m_d = \SI{6.3}{kg}$
-    \item Maximum thrust per drone: $T_{\max} = \frac{9g}{0.7} \approx \SI{126}{N}$ (90\% of hover at 70\% throttle)
+    \item Maximum thrust per drone: $T_{\max} = \frac{9g}{0.7} \approx \SI{126}{N}$ (hover at 70\% throttle)
     \item Total system capacity: 4 drones with combined thrust $\SI{504}{N}$ supporting \SI{35.2}{kg} system
 \end{itemize}
 
@@ -254,26 +284,46 @@ Each drone has maximum thrust $T_{\max} = \SI{126}{N}$. The thrust vector is sat
 \subsection{Noise and Disturbances}
 
 \subsubsection{Drone Mass Variance}
-Each drone mass is perturbed:
+Each drone mass is perturbed at initialization:
 \begin{equation}
     m_i = m_{\text{nominal}} + \mathcal{N}(0, \sigma_m^2), \quad \sigma_m = 0.02 \cdot m_{\text{nominal}}
     \label{eq:mass_variance}
 \end{equation}
 
 \subsubsection{Thrust Noise}
-Thrust vectors are corrupted by Gaussian noise:
+Thrust vectors are corrupted by Gaussian noise at each time step:
 \begin{equation}
     \mathbf{T}_i \leftarrow \mathbf{T}_i + \mathcal{N}(\mathbf{0}, \sigma_T^2\mathbf{I}_3), \quad \sigma_T = 0.05 \|\mathbf{T}_i\|
     \label{eq:thrust_noise}
 \end{equation}
+applied only when thrust magnitude exceeds \SI{1e-6}{N}.
 
 \subsubsection{Attachment Point Error}
-Attachment positions include fabrication errors:
+Attachment positions include fabrication errors initialized at start:
 \begin{equation}
     \mathbf{r}_i^{\text{actual}} = \mathbf{r}_i^{\text{nominal}} + \boldsymbol{\epsilon}_i, \quad \boldsymbol{\epsilon}_i \sim \mathcal{N}(\mathbf{0}, \sigma_a^2\mathbf{I}_3)
     \label{eq:attachment_error}
 \end{equation}
 with $\sigma_a = 0.01 \cdot a$.
+
+\subsubsection{Wind Disturbances}
+The system includes a realistic wind model with two components:
+\begin{equation}
+    \mathbf{v}_{\text{wind}}(t) = \mathbf{v}_{\text{baseline}} + \mathbf{v}_{\text{gust}}(t)
+    \label{eq:wind_model}
+\end{equation}
+where $\mathbf{v}_{\text{baseline}} = [0.5, 0, 0]^T$ m/s is a constant eastward wind, and $\mathbf{v}_{\text{gust}}$ follows a Gaussian random walk:
+\begin{equation}
+    \mathbf{v}_{\text{gust}}(t + \Delta t) = \mathbf{v}_{\text{gust}}(t) + \mathcal{N}(\mathbf{0}, \sigma_w^2 \Delta t \mathbf{I}_3)
+\end{equation}
+with $\sigma_w = \SI{0.3}{m/s/\sqrt{s}}$.
+
+The wind force on the payload is computed using simplified drag:
+\begin{equation}
+    \mathbf{F}_{\text{wind}} = \frac{1}{2}\rho_{\text{air}} C_d A \mathbf{v}_{\text{wind}} |\mathbf{v}_{\text{wind}}|
+    \label{eq:wind_force}
+\end{equation}
+where $\rho_{\text{air}} = \SI{1.225}{kg/m^3}$, $C_d = 1.0$, and $A = a^2$ is the payload cross-sectional area.
 
 \subsection{Ground Contact Model}
 
@@ -331,17 +381,30 @@ where:
 \end{itemize}
 
 \subsubsection{Thrust Allocation}
-We must map desired torque $\boldsymbol{\tau}_d$ to individual drone corrections $\delta\mathbf{F}_i$. The moment arm matrix is:
-\begin{equation}
-    \mathbf{A} = \begin{bmatrix} [\mathbf{r}_0]_\times \\ [\mathbf{r}_1]_\times \\ [\mathbf{r}_2]_\times \\ [\mathbf{r}_3]_\times \end{bmatrix} \in \mathbb{R}^{12 \times 3}
-    \label{eq:moment_arm_matrix}
-\end{equation}
-where $\mathbf{r}_i = \mathbf{r}_i^{\text{world}} - \mathbf{p}$ are relative position vectors.
+We must map desired torque $\boldsymbol{\tau}_d$ to individual drone thrust corrections $\delta\mathbf{F}_i$. The system constructs a 6×12 wrench mapping matrix $\mathbf{A}$ that enforces zero net force and produces the desired torque.
 
-The least-squares solution is:
+The matrix $\mathbf{A}$ is structured as:
 \begin{equation}
-    \delta\mathbf{F} = \mathbf{A}^\dagger \boldsymbol{\tau}_d = (\mathbf{A}^T\mathbf{A})^{-1}\mathbf{A}^T\boldsymbol{\tau}_d
+    \mathbf{A} = \begin{bmatrix} 
+    \mathbf{1}^T & \mathbf{1}^T & \mathbf{1}^T \\
+    \mathbf{1}^T & \mathbf{1}^T & \mathbf{1}^T \\
+    \mathbf{1}^T & \mathbf{1}^T & \mathbf{1}^T \\
+    \hline
+    [\mathbf{r}_0]_\times^T & [\mathbf{r}_1]_\times^T & [\mathbf{r}_2]_\times^T & [\mathbf{r}_3]_\times^T
+    \end{bmatrix} \in \mathbb{R}^{6 \times 12}
+    \label{eq:wrench_matrix}
+\end{equation}
+where the first 3 rows enforce $\sum_i \delta\mathbf{F}_i = \mathbf{0}$ (zero net force), and the last 3 rows compute torque contributions.
+
+The least-squares solution solves:
+\begin{equation}
+    \mathbf{A}\delta\mathbf{F} = \begin{bmatrix} \mathbf{0} \\ \boldsymbol{\tau}_d \end{bmatrix}
     \label{eq:thrust_allocation}
+\end{equation}
+
+After solving, the mean force is subtracted from each drone to ensure zero net translation:
+\begin{equation}
+    \delta\mathbf{F}_i \leftarrow \delta\mathbf{F}_i - \frac{1}{4}\sum_{j=0}^{3}\delta\mathbf{F}_j
 \end{equation}
 
 \subsection{PID Position Controller}
@@ -494,30 +557,37 @@ csd/
 ├── entity.py         # Base class for simulated entities
 ├── config.py         # Configuration parameters
 ├── clock.py          # Simulation time management
+├── tel.py            # Memory-mapped JSON telemetry
+├── receiver.py       # Telemetry receiver and aggregation
+├── wind.py           # Wind disturbance model
+├── tune.py           # Oscillation tracking for tuning
+├── utils.py          # Mathematical utilities (vee operator)
 ├── controller/
+│   ├── __init__.py   # Controller module initialization
 │   ├── thrust.py     # Main controller coordinator
 │   ├── position.py   # PID position controller
 │   ├── attitude.py   # Geometric attitude controller
 │   ├── plan.py       # Trajectory planner
 │   └── quintic.py    # Quintic polynomial functions
-├── receiver.py       # Telemetry receiver
 └── viz/              # Visualization modules
+    ├── gen.py        # Data generation for plots
+    └── utils.py      # Visualization utilities
 \end{verbatim}
 
 \subsection{Key Dependencies}
 
 \begin{itemize}
-    \item \texttt{numpy 2.3.4}: Numerical computations
-    \item \texttt{scipy 1.16.3}: Rotation representations and integration
-    \item \texttt{matplotlib 3.10.7}: Plotting and visualization
-    \item \texttt{pandas 2.3.3}: Data analysis
+    \item \texttt{numpy 2.3.4}: Numerical computations and array operations
+    \item \texttt{scipy 1.16.3}: Rotation representations and spatial transformations
+    \item \texttt{pandas 2.3.3}: Data analysis and time-series handling
     \item \texttt{pydantic 2.12.4}: Configuration validation
+    \item \texttt{plotly 6.4.0}: Interactive 3D visualization
 \end{itemize}
 
 \subsection{Numerical Integration}
 
 \subsubsection{Time Step}
-The simulation uses fixed time step $\Delta t = \SI{0.001}{s}$ (1 kHz update rate).
+The simulation uses fixed time step $\Delta t = \SI{0.01}{s}$ (100 Hz update rate).
 
 \subsubsection{Integration Scheme}
 Forward Euler integration is employed:
@@ -533,14 +603,14 @@ Forward Euler integration is employed:
 \subsection{Telemetry System}
 
 \subsubsection{Data Transmission}
-Each entity transmits telemetry at each timestep:
+Each entity transmits telemetry at each timestep via memory-mapped JSON files:
 \begin{itemize}
-    \item Payload: position, velocity, acceleration, orientation, angular velocity
-    \item Drones: position, commanded thrust, actual thrust
+    \item Payload: position, velocity, acceleration, orientation, angular velocity, angular acceleration, wind velocity
+    \item Drones: position, commanded thrust, actual thrust, feedforward force, feedback force, attitude correction
 \end{itemize}
 
 \subsubsection{Data Format}
-Telemetry is serialized to JSON and transmitted via message queues for real-time monitoring and post-processing.
+Telemetry is serialized to JSON and transmitted via memory-mapped files (Windows shared memory or file-backed mmap) for real-time monitoring and post-processing. The \texttt{receiver.py} module polls all channels and aggregates data into a single time-series structure.
 
 \subsection{Configuration Management}
 
@@ -567,12 +637,13 @@ This design enables parameter sweeps and ablation studies without code modificat
 \subsubsection{Simulation Parameters}
 All experiments use the following baseline configuration:
 \begin{itemize}
-    \item Simulation duration: \SI{30}{s}
-    \item Time step: \SI{0.001}{s}
-    \item Payload mass: \SI{10}{kg}
-    \item Drone max thrust: \SI{250}{N} each
-    \item Target waypoints: $(0, 0, 5)$, $(10, 0, 5)$, $(10, 10, 5)$ meters
+    \item Time step: \SI{0.01}{s} (100 Hz)
+    \item Drone base mass: \SI{6.3}{kg} (DJI Matrice 300 RTK)
+    \item Drone max thrust: \SI{126}{N} each
+    \item Motor time constant: \SI{0.2}{s}
 \end{itemize}
+
+Note: Payload mass, dimensions, waypoints, and simulation duration are configurable parameters varied across experiments.
 
 \subsubsection{Performance Metrics}
 We evaluate performance using:
@@ -781,6 +852,7 @@ The open-source implementation facilitates reproducibility and serves as an educ
 % REFERENCES
 % =============================================================================
 
+\newpage
 \begin{thebibliography}{99}
 
 \bibitem{lee2010}
@@ -839,6 +911,7 @@ Autonomous Robots, 33(1), 129--142.
 % APPENDICES
 % =============================================================================
 
+\newpage
 \appendix
 
 \section{Mathematical Derivations}
@@ -916,18 +989,27 @@ This is implemented in \texttt{scipy.spatial.transform.Rotation.from\_rotvec()}.
 \subsection{Least-Squares Thrust Allocation Algorithm}
 
 \begin{algorithm}
-\caption{Least-Squares Thrust Allocation}
+\caption{Least-Squares Thrust Allocation with Zero Net Force}
 \begin{algorithmic}[1]
 \Require Desired torque $\boldsymbol{\tau}_d$, attachment points $\{\mathbf{r}_i\}$
 \Ensure Thrust corrections $\{\delta\mathbf{F}_i\}$
-\State Construct moment arm matrix: $\mathbf{A}_{3i:3i+3,:} \gets [\mathbf{r}_i]_\times$ for $i=0,\ldots,3$
-\State Compute pseudoinverse: $\mathbf{A}^\dagger \gets (\mathbf{A}^T\mathbf{A})^{-1}\mathbf{A}^T$
-\State Allocate forces: $\delta\mathbf{F} \gets \mathbf{A}^\dagger \boldsymbol{\tau}_d$
-\State Reshape to per-drone forces: $\delta\mathbf{F}_i \gets \delta\mathbf{F}[3i:3i+3]$
+\State Initialize 6×12 matrix: $\mathbf{A} \gets \mathbf{0}_{6 \times 12}$
+\State Set force constraint rows: $\mathbf{A}[0:3, :] \gets \mathbf{1}$ (elementwise for each force component)
+\For{$i = 0$ to $3$}
+    \State Compute column indices: $c \gets 3i$
+    \State Set torque row for x: $\mathbf{A}[3, c+1] \gets -r_{i,z}$, $\mathbf{A}[3, c+2] \gets r_{i,y}$
+    \State Set torque row for y: $\mathbf{A}[4, c] \gets r_{i,z}$, $\mathbf{A}[4, c+2] \gets -r_{i,x}$
+    \State Set torque row for z: $\mathbf{A}[5, c] \gets -r_{i,y}$, $\mathbf{A}[5, c+1] \gets r_{i,x}$
+\EndFor
+\State Construct RHS: $\mathbf{b} \gets [\mathbf{0}^T, \boldsymbol{\tau}_d^T]^T$
+\State Solve least-squares: $\delta\mathbf{F} \gets \text{lstsq}(\mathbf{A}, \mathbf{b})$
+\State Reshape to 4×3: $\delta\mathbf{F}_i \gets \delta\mathbf{F}[3i:3i+3]$ for $i=0,\ldots,3$
+\State Remove mean: $\delta\mathbf{F}_i \gets \delta\mathbf{F}_i - \frac{1}{4}\sum_j \delta\mathbf{F}_j$
 \State \Return $\{\delta\mathbf{F}_i\}$
 \end{algorithmic}
 \end{algorithm}
 
+\newpage
 \subsection{Configuration Parameters}
 
 \begin{table}[h]
@@ -938,15 +1020,14 @@ This is implemented in \texttt{scipy.spatial.transform.Rotation.from\_rotvec()}.
 Parameter & Symbol & Value \\
 \midrule
 Time step & $\Delta t$ & \SI{0.01}{s} \\
-Simulation duration & $T_{\text{sim}}$ & \SI{45}{s} \\
 Time scale factor & -- & $0.7$ \\
-Payload mass & $m_c$ & \SI{10}{kg} \\
 Payload size & $a$ & \SI{0.25}{m} \\
 Drone mass (each) & $m_d$ & \SI{6.3}{kg} \\
 Total drone mass & -- & \SI{25.2}{kg} \\
 Drone max thrust & $T_{\max}$ & \SI{126}{N} \\
 Motor time constant & $\tau_m$ & \SI{0.2}{s} \\
 Gravity & $g$ & \SI{9.80665}{m/s^2} \\
+Air density & $\rho_{\text{air}}$ & \SI{1.225}{kg/m^3} \\
 Attitude gain & $K_R$ & $4T_{\max}$ \\
 Angular velocity gain & $K_\omega$ & $4T_{\max}$ \\
 Ultimate gain (xy) & $K_{u,xy}$ & $0.08 T_{\max}$ \\
@@ -960,7 +1041,10 @@ Derivative gain (z) & $K_{d,z}$ & $0.1 K_{u,z} T_u$ \\
 Mass variance & $\sigma_m$ & $0.02 m_d$ (2\%) \\
 Thrust noise & $\sigma_T$ & $0.05 \|\mathbf{T}\|$ (5\%) \\
 Attachment error & $\sigma_a$ & $0.01 a$ (1\%) \\
-Hover times & -- & [2.0, 2.0, 2.0] s \\
+Wind baseline velocity & $\mathbf{v}_{\text{baseline}}$ & [0.5, 0, 0] m/s \\
+Wind gust intensity & $\sigma_w$ & \SI{0.3}{m/s/\sqrt{s}} \\
+Wind drag coefficient & $C_d$ & 1.0 \\
+Wind seed & -- & 0 \\
 Max takeoff fraction & -- & $0.75$ \\
 Max translation fraction & -- & $0.33$ \\
 \bottomrule
@@ -968,15 +1052,16 @@ Max translation fraction & -- & $0.33$ \\
 \label{tab:parameters}
 \end{table}
 
+\newpage
 \section{Telemetry Data Format}
 \label{app:telemetry}
 
 \subsection{Payload Telemetry Schema}
 
-\begin{lstlisting}[language=json]
+\begin{lstlisting}[language=python]
 {
-  "topic": "cube",
-  "time": 1.234,
+  "irl_time": 1.234,
+  "sim_time": 1.200,
   "pos": [x, y, z],
   "vel": [vx, vy, vz],
   "acc": [ax, ay, az],
@@ -984,19 +1069,23 @@ Max translation fraction & -- & $0.33$ \\
           [r21, r22, r23],
           [r31, r32, r33]],
   "ang_vel": [wx, wy, wz],
-  "ang_acc": [alpha_x, alpha_y, alpha_z]
+  "ang_acc": [alpha_x, alpha_y, alpha_z],
+  "wind": [wind_x, wind_y, wind_z]
 }
 \end{lstlisting}
 
 \subsection{Drone Telemetry Schema}
 
-\begin{lstlisting}[language=json]
+\begin{lstlisting}[language=python]
 {
-  "topic": "drone_0",
-  "time": 1.234,
+  "irl_time": 1.234,
+  "sim_time": 1.200,
   "pos": [x, y, z],
   "command": [Tcx, Tcy, Tcz],
-  "thrust": [Tx, Ty, Tz]
+  "thrust": [Tx, Ty, Tz],
+  "feedforward": [Ffx, Ffy, Ffz],
+  "feedback": [Fbx, Fby, Fbz],
+  "attitude": [Fax, Fay, Faz]
 }
 \end{lstlisting}
 

@@ -55,7 +55,7 @@ CUBE_SIZE = 0.25  # meters
 # ============================================================================
 DRONE_MASS = 6.3  # kg (base mass, subject to random variation)
 DRONE_MAX_THRUST = 9 * -G_ACCELERATION / 0.7  # N
-DRONE_TIME_CONSTANT = 1e-7  # Motor response time constant (seconds)
+DRONE_TIME_CONSTANT = 0.2  # Motor response time constant (seconds)
 
 # Noise parameters
 DRONE_MASS_VARIANCE_AMOUNT = 0.02  # Mass variation coefficient (2%)
