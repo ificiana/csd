@@ -510,23 +510,23 @@ def plot_drone(drone: Drone, drone_id: int, bw: bool = False):
         drone_id: Drone identifier (0-3).
         bw: If True, use black & white print-friendly styling.
     """
-    plot_time_series(
-        drone.df,
-        ["x", "y", "z"],
-        title=f"Drone {drone_id} Position",
-        ylabel="Position (m)",
-        bw=bw,
-    )
-    plot_time_series(
-        drone.df, ["x", "y", "z"], title=f"Drone {drone_id} Position", traj=True, bw=bw
-    )
-    plot_time_series(
-        drone.df,
-        ["cx", "cy", "cz"],
-        title=f"Drone {drone_id} Command",
-        ylabel="Command (N)",
-        bw=bw,
-    )
+    # plot_time_series(
+    #     drone.df,
+    #     ["x", "y", "z"],
+    #     title=f"Drone {drone_id} Position",
+    #     ylabel="Position (m)",
+    #     bw=bw,
+    # )
+    # plot_time_series(
+    #     drone.df, ["x", "y", "z"], title=f"Drone {drone_id} Position", traj=True, bw=bw
+    # )
+    # plot_time_series(
+    #     drone.df,
+    #     ["cx", "cy", "cz"],
+    #     title=f"Drone {drone_id} Command",
+    #     ylabel="Command (N)",
+    #     bw=bw,
+    # )
     plot_time_series(
         drone.df,
         ["tx", "ty", "tz"],

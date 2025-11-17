@@ -56,7 +56,7 @@ tpl2 = r"""\", 2**24, file=True).read())"
    "metadata": {},
    "outputs": [],
    "source": [
-    "plot_graphs(data)"
+    "plot_graphs(data, bw=True)"
    ]
   }
  ],
