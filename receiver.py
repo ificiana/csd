@@ -7,7 +7,12 @@ into a single memory-mapped file for visualization and analysis.
 
 import time
 
-from config import POLLING_RATE, SENSOR_CHANNELS
+from config import (
+    DRONE_TELEMETRY_FIELDS,
+    PAYLOAD_TELEMETRY_FIELDS,
+    POLLING_RATE,
+    SENSOR_CHANNELS,
+)
 from tel import MMapJSON
 
 DEL = True
@@ -19,24 +24,8 @@ if DEL:
     [s.clear() for s in sensors.values()]
 
 data = {
-    **{
-        f"drone_{k}": {
-            "irl_time": {},
-            "thrust": {},
-            "command": {},
-            "pos": {},
-        }
-        for k in range(4)
-    },
-    "cube": {
-        "irl_time": {},
-        "pos": {},
-        "rot": {},
-        "acc": {},
-        "vel": {},
-        "ang_acc": {},
-        "ang_vel": {},
-    },
+    **{f"drone_{k}": {field: {} for field in DRONE_TELEMETRY_FIELDS} for k in range(4)},
+    "cube": {field: {} for field in PAYLOAD_TELEMETRY_FIELDS},
 }
 
 while True:

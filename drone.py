@@ -50,6 +50,9 @@ class Drone(Entity):
         self.thrust = np.zeros(3)
         self.pos = np.zeros(3)
         self.thrust_command = np.zeros(3)
+        self.feedforward_force = np.zeros(3)
+        self.feedback_force = np.zeros(3)
+        self.attitude_correction = np.zeros(3)
 
         np.random.seed(1 + index)
         self.mass = self.mass + np.random.normal(0, self.mass * DRONE_MASS_VARIANCE)
@@ -84,4 +87,7 @@ class Drone(Entity):
         t["pos"] = [*self.pos]
         t["command"] = [*self.thrust_command]
         t["thrust"] = [*self.thrust]
+        t["feedforward"] = [*self.feedforward_force]
+        t["feedback"] = [*self.feedback_force]
+        t["attitude"] = [*self.attitude_correction]
         return t

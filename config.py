@@ -158,5 +158,25 @@ SENSOR_CHANNELS = [
     "drone_3",
 ]
 
+DRONE_TELEMETRY_FIELDS = [
+    "irl_time",
+    "pos",
+    "command",
+    "thrust",
+    "feedforward",
+    "feedback",
+    "attitude",
+]
+
+PAYLOAD_TELEMETRY_FIELDS = [
+    "irl_time",
+    "pos",
+    "rot",
+    "acc",
+    "vel",
+    "ang_acc",
+    "ang_vel",
+]
+
 MMAP_SIZE = 4096  # Initial memory-mapped file size (bytes)
 POLLING_RATE = 500  # Hz - telemetry polling frequency

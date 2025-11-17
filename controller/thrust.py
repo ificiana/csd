@@ -99,7 +99,13 @@ class ThrustController:
 
         per_drone_thrust = thrust_corrections + (feedforward_force + feedback_force) / 4
 
-        for d, F_i in zip(self.drones, per_drone_thrust):
+        feedforward_per_drone = feedforward_force / 4
+        feedback_per_drone = feedback_force / 4
+
+        for d, F_i, att_corr in zip(self.drones, per_drone_thrust, thrust_corrections):
+            d.feedforward_force = feedforward_per_drone
+            d.feedback_force = feedback_per_drone
+            d.attitude_correction = att_corr
             d.set_thrust(*F_i)
 
         self._update_telemetry(pos)
