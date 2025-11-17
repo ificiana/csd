@@ -14,13 +14,13 @@ import numpy as np
 # Enable/disable various simulation features for testing and debugging
 
 # Noise switches
-ENABLE_DRONE_MASS_VARIANCE = True  # Add random variance to drone masses
-ENABLE_DRONE_THRUST_NOISE = True  # Add noise to drone thrust outputs
-ENABLE_ATTACHMENT_ERROR = True  # Add error to attachment point positions
+ENABLE_DRONE_MASS_VARIANCE = False  # Add random variance to drone masses
+ENABLE_DRONE_THRUST_NOISE = False  # Add noise to drone thrust outputs
+ENABLE_ATTACHMENT_ERROR = False  # Add error to attachment point positions
 
 # Controller switches
-ENABLE_ATTITUDE_CONTROLLER = True  # Enable geometric attitude control
-ENABLE_POSITION_CONTROLLER = True  # Enable PID position control
+ENABLE_ATTITUDE_CONTROLLER = False  # Enable geometric attitude control
+ENABLE_POSITION_CONTROLLER = False  # Enable PID position control
 
 # Profiling
 ENABLE_PROFILING = True  # Enable cProfile performance profiling
@@ -53,11 +53,11 @@ CUBE_SIZE = 0.25  # meters
 # ============================================================================
 DRONE_MASS = 6.3  # kg (base mass, subject to random variation)
 DRONE_MAX_THRUST = 9 * -G_ACCELERATION / 0.7  # N
-DRONE_TIME_CONSTANT = 0.2  # Motor response time constant (seconds)
+DRONE_TIME_CONSTANT = 1e-7  # Motor response time constant (seconds)
 
 # Noise parameters
 DRONE_MASS_VARIANCE_AMOUNT = 0.02  # Mass variation coefficient (2%)
-DRONE_THRUST_NOISE_AMOUNT = 0.05  # 1% thrust magnitude noise
+DRONE_THRUST_NOISE_AMOUNT = 0.05  # 5% thrust magnitude noise
 
 # Conditional noise values (set to 0 if disabled)
 DRONE_MASS_VARIANCE = DRONE_MASS_VARIANCE_AMOUNT if ENABLE_DRONE_MASS_VARIANCE else 0.0
@@ -84,7 +84,7 @@ NORTH = 10  # Target northward position (meters)
 # ============================================================================
 # TRAJECTORY PHASE TIMING
 # ============================================================================
-HOVER_TIMES = [2.0, 2.0, 2.0]  # Hover durations at each waypoint (seconds)
+HOVER_TIMES = [2.0, 2.0, 10.0]  # Hover durations at each waypoint (seconds)
 
 # ============================================================================
 # CONTROLLER GAINS

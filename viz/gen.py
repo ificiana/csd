@@ -2,6 +2,16 @@ from pathlib import Path
 
 
 def find_mmap_files(root: str, recursive: bool = True):
+    """
+    Finds all .mmap files in directory.
+
+    Args:
+        root: Root directory path to search.
+        recursive: If True, search subdirectories recursively. Default is True.
+
+    Returns:
+        Sorted list of resolved .mmap file paths.
+    """
     rootp = Path(root)
     if recursive:
         return sorted(p.resolve() for p in rootp.rglob("*.mmap"))

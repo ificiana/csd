@@ -9,14 +9,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from clock import get_time
-from config import EAST, G_ACCELERATION as G
-from config import (
-    HEIGHT,
-    MAX_TAKEOFF_FRACTION,
-    MAX_TRANSL_FRACTION,
-    NORTH,
-)
+from clock import get_time, is_stopped
+from config import EAST
+from config import G_ACCELERATION as G
+from config import HEIGHT, MAX_TAKEOFF_FRACTION, MAX_TRANSL_FRACTION, NORTH
 from controller.attitude import AttitudeController
 from controller.plan import TrajectoryPlanner
 from controller.position import PositionController
@@ -31,6 +27,11 @@ class ThrustController:
     """Hierarchical controller combining geometric attitude and PID position control."""
 
     def __init__(self, drones: list[Drone], payload: "Cube") -> None:
+        """
+        Args:
+            drones: List of 4 Drone instances.
+            payload: Cube payload instance.
+        """
         self.drones = drones
         self.payload = payload
         self.mass = self.payload.mass + sum(d.mass for d in self.drones)
@@ -78,7 +79,8 @@ class ThrustController:
 
         a_x, a_y, a_z = self.planner.get_feedforward_acceleration(pos)
 
-        self.planner.check_ground_contact(self.payload.bottom)
+        if is_stopped():
+            self.planner.phase = 7  # Force end of trajectory if stopped
 
         feedforward_force = self.mass * np.array([a_x, a_y, a_z])
         thrust_corrections = self.attitude_controller.compute_thrust_corrections()
@@ -103,7 +105,12 @@ class ThrustController:
         self._update_telemetry(pos)
 
     def _update_telemetry(self, pos: np.ndarray):
-        """Updates oscillation tracking and prints live telemetry."""
+        """
+        Updates oscillation tracking and prints live telemetry.
+
+        Args:
+            pos: Current payload position [x, y, z].
+        """
         t = get_time()
         yaw, pitch, roll = self.payload.orientation.as_euler("ZYX", degrees=True)
         vel = self.payload.vel

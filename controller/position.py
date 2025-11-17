@@ -9,7 +9,7 @@ Theory:
     where e = x_ref - x is the tracking error.
 
     For payload control:
-        F_des = K_p (x_ref - x) + K_d (v_ref - v) + K_i int((x_ref - x) dt)
+        F_des = m * (K_p (x_ref - x) + K_d (v_ref - v) + K_i int((x_ref - x) dt))
 
     The gains K_p, K_d, K_i are tuned using Ziegler-Nichols method based on
     ultimate gain K_u and ultimate period T_u from stability analysis.
@@ -25,6 +25,10 @@ class PositionController:
     """PID position controller for 3-DOF translational control."""
 
     def __init__(self, mass: float):
+        """
+        Args:
+            mass: Total system mass (payload + drones) in kg.
+        """
         self.mass = mass
         self.integral_error = np.zeros(3)
 

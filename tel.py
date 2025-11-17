@@ -6,10 +6,10 @@ and visualization/logging processes using memory-mapped files or Windows
 shared memory regions.
 """
 
-from io import BufferedRandom
 import json
 import mmap
 import os
+from io import BufferedRandom
 
 from config import MMAP_SIZE
 
@@ -24,8 +24,8 @@ class MMapJSON:
         """
         Args:
             path_or_topic: File path (file=True) or shared memory topic (file=False).
-            size: Initial buffer size in bytes.
-            file: If True uses file-backed mmap, else Windows shared memory.
+            size: Initial buffer size in bytes. Default is MMAP_SIZE.
+            file: If True uses file-backed mmap, else Windows shared memory. Default is False.
         """
         self.file_mode = file
         self.size = size

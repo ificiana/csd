@@ -28,20 +28,20 @@ Theory:
     MOMENT OF INERTIA:
         For a uniform cube with mass m_c and side length a:
             I_cube = (m_c * a^2 / 6) * I_3
-        
+
         For 4 point mass drones at attachment points r_i = (±a/2, ±a/2, a/2):
             I_drones = sum_i m_i * (||r_i||^2 * I_3 - r_i ⊗ r_i)
-        
+
         For symmetric configuration with total drone mass m_d:
             ||r_i||^2 = (a/2)^2 + (a/2)^2 + (a/2)^2 = 3a^2/4
-            
+
             Each drone contributes to diagonal:
                 I_xx = m_i * (y_i^2 + z_i^2) = m_i * (a^2/4 + a^2/4) = m_i * a^2/2
                 I_yy = m_i * (x_i^2 + z_i^2) = m_i * (a^2/4 + a^2/4) = m_i * a^2/2
                 I_zz = m_i * (x_i^2 + y_i^2) = m_i * (a^2/4 + a^2/4) = m_i * a^2/2
-            
+
             Summing over 4 drones: I_drones = (m_d/2 * a^2) * I_3
-        
+
         Combined system:
             I_total = I_cube + I_drones
                     = (m_c/6 + m_d/2) * a^2 * I_3
@@ -61,13 +61,15 @@ import time
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-from clock import TIME_STEP, get_time, time_tick
+from clock import TIME_STEP, get_time, stop, time_tick
 from config import (
     ATTACHMENT_ERROR_SCALE,
     ATTACHMENT_ERROR_SEED,
     ATTACHMENT_POINTS,
     CUBE_MASS,
     CUBE_SIZE,
+    DRONE_MASS,
+    DRONE_THRUST_NOISE,
     EAST,
     ENABLE_PROFILING,
     G_ACCELERATION,
@@ -93,6 +95,11 @@ class Cube(Entity):
     h = size / 2
 
     def __init__(self, pos: np.ndarray, topic: str = "cube") -> None:
+        """
+        Args:
+            pos: Initial position [x, y, z] at ground level.
+            topic: Telemetry channel name. Default is "cube".
+        """
         super().__init__(topic)
         self.pos = pos + np.array([0, 0, self.h])
         self.moi = ((self.mass / 6 + drone_total_mass / 2) * self.size**2) * np.eye(3)
@@ -104,24 +111,44 @@ class Cube(Entity):
 
     @property
     def top(self):
-        """Returns world coordinates of top attachment points."""
+        """
+        Returns world coordinates of top attachment points.
+
+        Returns:
+            4x3 array of attachment point positions.
+        """
         local_coords = np.column_stack([ATTACHMENT_POINTS * self.h, np.full(4, self.h)])
         return self.orientation.apply(local_coords) + self.pos
 
     @property
     def bottom(self):
-        """Returns world coordinates of bottom corners."""
+        """
+        Returns world coordinates of bottom corners.
+
+        Returns:
+            4x3 array of bottom corner positions.
+        """
         local_coords = np.column_stack(
             [ATTACHMENT_POINTS * self.h, np.full(4, -self.h)]
         )
         return self.orientation.apply(local_coords) + self.pos
 
     def set_alpha(self, torques: np.ndarray):
-        """Computes angular acceleration from external torques."""
+        """
+        Computes angular acceleration from external torques.
+
+        Args:
+            torques: 4x3 array of torques from each drone.
+        """
         self.alpha = np.linalg.inv(self.moi) @ torques.sum(axis=0)
 
     def set_acc(self, forces: np.ndarray):
-        """Computes linear acceleration from external forces."""
+        """
+        Computes linear acceleration from external forces.
+
+        Args:
+            forces: 4x3 array of forces from each drone (including gravity).
+        """
         self.acc = (forces.sum(axis=0) + self.mass * G) / (self.mass + drone_total_mass)
 
     def update(self):
@@ -143,8 +170,9 @@ class Cube(Entity):
         if penetration < 0:
             if np.linalg.norm(self.vel) > 0.1:
                 print(
-                    f"Ground Hit- Impact Velocity: {np.linalg.norm(self.vel):.2f} m/s \n"
+                    f"\n[   INFO] Ground Contact - Impact Velocity: {np.linalg.norm(self.vel):.2f} m/s"
                 )
+                stop()
             self.pos -= [0, 0, penetration]
             self.alpha = np.zeros(3)
             self.acc = np.zeros(3)
@@ -203,10 +231,9 @@ def print_initialization():
     )
     print(f"  Max Control:     {controller.max_control:.1f} N")
     print()
-    print("TRAJECTORY COEFFICIENTS:")
-    print(f"  Z (vertical):    {controller.z_coeff:.4f}")
-    print(f"  X (east):        {controller.x_coeff:.4f}")
-    print(f"  Y (north):       {controller.y_coeff:.4f}")
+    print("TRAJECTORY:")
+    print(f"  Average Ascend Speed:    {controller.z_coeff:.4f} m/s")
+    print(f"  Average Drift Speed:     {controller.x_coeff:.4f} m/s")
     print()
     print("WAYPOINTS:")
     print(f"  Takeoff Height:  {HEIGHT:.1f} m")
@@ -216,13 +243,17 @@ def print_initialization():
     print("SIMULATION PARAMETERS:")
     print(f"  Time Step:       {TIME_STEP:.4f} s")
     print(f"  Duration:        {SIM_DURATION:.1f} s")
-    print(f"  Time Scale:      {TIME_SCALE_FACTOR:.2f}x")
     print(f"  Gravity:         {G_ACCELERATION:.5f} m/s²")
     print()
     print("NOISE & ERRORS:")
     print(f"  Attachment Error Seed:  {ATTACHMENT_ERROR_SEED}")
     print(f"  Attachment Error Scale: {ATTACHMENT_ERROR_SCALE:.6f}")
     print(f"  Attachment Error RMS:   {np.linalg.norm(attachment_error) / 4:.6f} m")
+    # print thrust noise and mass noise
+    print(f"  Thrust Noise:           {DRONE_THRUST_NOISE:.6f} N")
+    print(
+        f"  Mass Noise RMS:         {np.linalg.norm(drone_total_mass - DRONE_MASS * 4) / 4:.6f} kg"
+    )
     print()
     print("=" * 80)
     print("STARTING SIMULATION...")

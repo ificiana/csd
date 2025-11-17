@@ -42,6 +42,10 @@ class AttitudeController:
     """Geometric attitude controller on SO(3) with thrust allocation."""
 
     def __init__(self, payload):
+        """
+        Args:
+            payload: Cube payload instance with orientation and inertia properties.
+        """
         self.payload = payload
         self.integral_error = np.zeros(3)
 

@@ -13,7 +13,14 @@ class DOFOscillationTracker:
         self.data = {}
 
     def _init_axis(self, name, initial_value, t):
-        """Initializes tracking data structure for a new axis."""
+        """
+        Initializes tracking data structure for a new axis.
+
+        Args:
+            name: Axis identifier string.
+            initial_value: Initial value for the tracked quantity.
+            t: Initial time.
+        """
         self.data[name] = {
             "prev": initial_value,
             "prev_slope": 0,
@@ -29,7 +36,14 @@ class DOFOscillationTracker:
         }
 
     def update(self, name, value, t):
-        """Updates oscillation metrics for one DOF using peak detection."""
+        """
+        Updates oscillation metrics for one DOF using peak detection.
+
+        Args:
+            name: Axis identifier string.
+            value: Current value of the tracked quantity.
+            t: Current time.
+        """
         if name not in self.data:
             self._init_axis(name, value, t)
 
@@ -67,7 +81,15 @@ class DOFOscillationTracker:
         d["prev_slope"] = sign
 
     def get_info(self, name):
-        """Returns current tracking statistics for the specified DOF."""
+        """
+        Returns current tracking statistics for the specified DOF.
+
+        Args:
+            name: Axis identifier string.
+
+        Returns:
+            Dictionary with keys: max, min, t_max, t_min, period, current_amplitude.
+        """
         d = self.data[name]
         return {
             "max": d["max"],

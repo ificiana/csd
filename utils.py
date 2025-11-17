@@ -27,7 +27,11 @@ def vee(skew_symmetric_matrix):
     """
     Extracts vector from skew-symmetric matrix (vee operator).
 
-    Returns [S[2,1], S[0,2], S[1,0]] for skew-symmetric matrix S.
+    Args:
+        skew_symmetric_matrix: 3x3 skew-symmetric matrix in so(3).
+
+    Returns:
+        3-element vector [S[2,1], S[0,2], S[1,0]].
     """
     return np.array(
         [

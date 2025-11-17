@@ -42,6 +42,10 @@ class Drone(Entity):
     max_thrust = float(DRONE_MAX_THRUST)
 
     def __init__(self, index: int) -> None:
+        """
+        Args:
+            index: Drone identifier (0-3) for unique random seed.
+        """
         super().__init__(f"drone_{index}")
         self.thrust = np.zeros(3)
         self.pos = np.zeros(3)
@@ -51,7 +55,14 @@ class Drone(Entity):
         self.mass = self.mass + np.random.normal(0, self.mass * DRONE_MASS_VARIANCE)
 
     def set_thrust(self, x=0.0, y=0.0, z=0.0):
-        """Commands thrust vector and updates actual thrust with first-order lag."""
+        """
+        Commands thrust vector and updates actual thrust with first-order lag.
+
+        Args:
+            x: Thrust component in x-direction (N). Default is 0.0.
+            y: Thrust component in y-direction (N). Default is 0.0.
+            z: Thrust component in z-direction (N). Default is 0.0.
+        """
         self.thrust_command = np.array([x, y, z], dtype=float)
 
         thrust_error = self.thrust_command - self.thrust

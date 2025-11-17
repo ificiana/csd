@@ -18,14 +18,7 @@ Theory:
 import numpy as np
 
 from clock import get_time
-from config import (
-    EAST,
-    HEIGHT,
-    HOVER_TIMES,
-    NORTH,
-    POSITION_TOLERANCE,
-    G_ACCELERATION as gravity,
-)
+from config import EAST, G_ACCELERATION, HEIGHT, HOVER_TIMES, NORTH, POSITION_TOLERANCE
 from controller import quintic
 
 
@@ -41,6 +34,15 @@ class TrajectoryPlanner:
         travel_east: float,
         travel_north: float,
     ):
+        """
+        Args:
+            payload_half_height: Half of payload cube size (meters).
+            z_coeff: Quintic trajectory coefficient for vertical motion.
+            x_coeff: Quintic trajectory coefficient for east-west motion.
+            y_coeff: Quintic trajectory coefficient for north-south motion.
+            travel_east: Total distance to travel eastward (meters).
+            travel_north: Total distance to travel northward (meters).
+        """
         self.payload_h = payload_half_height
         self.z_coeff = z_coeff
         self.x_coeff = x_coeff
@@ -54,7 +56,12 @@ class TrajectoryPlanner:
         self.tolerance = POSITION_TOLERANCE
 
     def get_reference_position(self) -> np.ndarray:
-        """Returns reference position for current trajectory phase."""
+        """
+        Returns reference position for current trajectory phase.
+
+        Returns:
+            Reference position [x, y, z] in world frame.
+        """
         t = get_time() - self.phase_start_time
         H = HEIGHT + self.payload_h
 
@@ -82,7 +89,12 @@ class TrajectoryPlanner:
                 return np.array([EAST, NORTH, self.payload_h])
 
     def get_reference_velocity(self) -> np.ndarray:
-        """Returns reference velocity for current trajectory phase."""
+        """
+        Returns reference velocity for current trajectory phase.
+
+        Returns:
+            Reference velocity [vx, vy, vz] in world frame.
+        """
         t = get_time() - self.phase_start_time
         H = HEIGHT + self.payload_h
 
@@ -117,7 +129,6 @@ class TrajectoryPlanner:
 
         Args:
             pos: Current payload position.
-            gravity: Gravity acceleration (negative).
 
         Returns:
             Tuple of (a_x, a_y, a_z) accelerations.
@@ -128,9 +139,12 @@ class TrajectoryPlanner:
         match self.phase:
             case 0:
                 if pos[2] < H:
-                    a_z = quintic.acceleration(self.z_coeff, HEIGHT, t_global) - gravity
+                    a_z = (
+                        quintic.acceleration(self.z_coeff, HEIGHT, t_global)
+                        - G_ACCELERATION
+                    )
                 else:
-                    a_z = -gravity
+                    a_z = -G_ACCELERATION
                     self._advance_phase(1, "Reached height: {}", HEIGHT)
                 a_x = a_y = 0.0
 
@@ -138,7 +152,7 @@ class TrajectoryPlanner:
                 if t_global > self.hover_times[0]:
                     self._advance_phase(2, "Hover complete, moving East")
                 a_x = a_y = 0.0
-                a_z = -gravity
+                a_z = -G_ACCELERATION
 
             case 2:
                 dir_e = np.sign(EAST) if not np.isclose(EAST, 0.0) else 0.0
@@ -152,19 +166,19 @@ class TrajectoryPlanner:
                 if dir_e == 0.0 or arrived_e:
                     self._advance_phase(3, "Reached East: {}", EAST)
                     a_x = a_y = 0.0
-                    a_z = -gravity
+                    a_z = -G_ACCELERATION
                 else:
                     a_x = dir_e * quintic.acceleration(
                         self.x_coeff, self.travel_e, t_global
                     )
                     a_y = 0.0
-                    a_z = -gravity
+                    a_z = -G_ACCELERATION
 
             case 3:
                 if t_global > self.hover_times[1]:
                     self._advance_phase(4, "Hover complete, moving North")
                 a_x = a_y = 0.0
-                a_z = -gravity
+                a_z = -G_ACCELERATION
 
             case 4:
                 dir_n = np.sign(NORTH) if not np.isclose(NORTH, 0.0) else 0.0
@@ -178,19 +192,19 @@ class TrajectoryPlanner:
                 if dir_n == 0.0 or arrived_n:
                     self._advance_phase(5, "Reached North: {}", NORTH)
                     a_x = a_y = 0.0
-                    a_z = -gravity
+                    a_z = -G_ACCELERATION
                 else:
                     a_x = 0.0
                     a_y = dir_n * quintic.acceleration(
                         self.y_coeff, self.travel_n, t_global
                     )
-                    a_z = -gravity
+                    a_z = -G_ACCELERATION
 
             case 5:
                 if t_global > self.hover_times[2]:
-                    self._advance_phase(6, "Hover complete, initiating soft landing")
+                    self._advance_phase(6, "Hover complete, initiating landing")
                 a_x = a_y = 0.0
-                a_z = -gravity
+                a_z = -G_ACCELERATION
 
             case 6:
                 H = HEIGHT + self.payload_h
@@ -205,7 +219,7 @@ class TrajectoryPlanner:
                     a_x = a_y = 0.0
                     a_z = (
                         -quintic.acceleration(self.z_coeff, landing_distance, t_global)
-                        - gravity
+                        - G_ACCELERATION
                     )
 
             case _:
@@ -217,31 +231,14 @@ class TrajectoryPlanner:
         return a_x, a_y, a_z
 
     def _advance_phase(self, new_phase: int, message: str, *args):
-        """Advances to next phase and resets timer."""
+        """
+        Advances to next phase and resets timer.
+
+        Args:
+            new_phase: Phase number to transition to.
+            message: Format string for status message.
+            *args: Arguments for format string.
+        """
         self.phase = new_phase
         self.phase_start_time = get_time()
         print(f"\n[PHASE {new_phase}] " + message.format(*args))
-
-    def check_ground_contact(self, bottom_corners: np.ndarray) -> bool:
-        """
-        Checks if payload has contacted ground during landing phase.
-
-        Args:
-            bottom_corners: Array of bottom corner z-coordinates.
-
-        Returns:
-            True if ground contact detected.
-        """
-        if self.phase != 6:
-            return False
-
-        B = bottom_corners[:, 2]
-        bottom_min_idx = np.argmin(B)
-        penetration = B[bottom_min_idx]
-        if penetration < 0:
-            print("\n" + "!" * 80)
-            print("GROUND CONTACT DETECTED - CRASH OR HARD LANDING!")
-            print("!" * 80)
-            self.phase = 7
-            return True
-        return False

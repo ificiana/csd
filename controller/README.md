@@ -35,7 +35,7 @@ PID position controller for 3-DOF translational control.
 - `compute_force(pos, vel, pos_ref, vel_ref)` - Computes desired force using PID law
 
 **Theory:**
-Classical PID control: F = K_p * e_pos + K_d * e_vel + K_i * int(e_pos dt)
+Classical PID control: F = m * (K_p * e_pos + K_d * e_vel + K_i * int(e_pos dt))
 
 ### attitude.py
 Geometric attitude controller on SO(3) with thrust allocation.
@@ -53,8 +53,7 @@ Multi-phase trajectory state machine.
 **Class:** `TrajectoryPlanner`
 - `get_reference_position()` - Returns reference position for current phase
 - `get_reference_velocity()` - Returns reference velocity for current phase
-- `get_feedforward_acceleration(pos, gravity)` - Computes feedforward acceleration
-- `check_ground_contact(bottom_corners)` - Detects ground contact
+- `get_feedforward_acceleration(pos)` - Computes feedforward acceleration
 
 **Phases:**
 0. Takeoff - Vertical ascent
@@ -63,7 +62,8 @@ Multi-phase trajectory state machine.
 3. Hover - Stabilize at waypoint
 4. Translate North - Horizontal motion (y-axis)
 5. Hover - Final position hold
-6. Land - Controlled descent (optional)
+6. Land - Controlled descent
+7. Complete - End of trajectory
 
 ### thrust.py
 Main controller coordinator integrating all components.
@@ -90,15 +90,15 @@ controller.update()
 
 ```
 ThrustController.update()
-├── TrajectoryPlanner.get_feedforward_acceleration()
+├── TrajectoryPlanner.get_feedforward_acceleration(pos)
 │   └── quintic.acceleration()
-├── PositionController.compute_force()
+├── AttitudeController.compute_thrust_corrections()
+│   └── [Least-squares thrust allocation]
+├── PositionController.compute_force(pos, vel, pos_ref, vel_ref)
 │   ├── TrajectoryPlanner.get_reference_position()
 │   │   └── quintic.position()
 │   └── TrajectoryPlanner.get_reference_velocity()
 │       └── quintic.velocity()
-├── AttitudeController.compute_thrust_corrections()
-│   └── [Least-squares thrust allocation]
 └── [Combine and saturate thrusts]
 ```
 
