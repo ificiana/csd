@@ -1,0 +1,69 @@
+(csd) PS C:\Users\rehba\OneDrive\Desktop\csd project\csd> .\main.py
+================================================================================
+COOPERATIVE PAYLOAD TRANSPORT SIMULATION
+================================================================================
+
+PAYLOAD CONFIGURATION:
+  Mass:            10.00 kg
+  Size:            0.25 m
+  Moment of Inertia: 0.9037 kg·m²
+
+DRONE CONFIGURATION:
+  Drone 0:  Mass = 6.5047 kg, Max Thrust = 126.1 N
+  Drone 1:  Mass = 6.2475 kg, Max Thrust = 126.1 N
+  Drone 2:  Mass = 6.5254 kg, Max Thrust = 126.1 N
+  Drone 3:  Mass = 6.3064 kg, Max Thrust = 126.1 N
+  Total Mass:      25.5839 kg
+
+SYSTEM CONFIGURATION:
+  Total Mass:      35.58 kg
+  Max Thrust:      504.3 N
+  Max Takeoff:     378.3 N (75%)
+  Max Translation: 41.6 N (33%)
+  Max Control:     84.5 N
+
+TRAJECTORY:
+  Average Ascend Speed:    0.8444 m/s
+  Average Drift Speed:     1.4231 m/s
+
+WAYPOINTS:
+  Takeoff Height:  5.0 m
+  East Target:     10.0 m
+  North Target:    10.0 m
+
+SIMULATION PARAMETERS:
+  Time Step:       0.0100 s
+  Duration:        45.0 s
+  Gravity:         -9.80665 m/s²
+
+NOISE & ERRORS:
+  Attachment Error Seed:  0
+  Attachment Error Scale: 0.010000
+  Attachment Error RMS:   0.002572 m
+  Thrust Noise:           0.050000 N
+  Mass Noise RMS:         0.095973 kg
+
+WIND MODEL:
+  Enabled:                True
+  Baseline Wind:          [0.97, 0.00, 0.00] knots
+  Gust Intensity (sigma): 0.30 ms^-0.5
+  Drag Coefficient:       1.00
+  Wind Seed:              0
+
+================================================================================
+STARTING SIMULATION...
+================================================================================
+
+[  8.79s] Phase: TAKEOFF      | Pos: N= -4.819 E= -6.228 D= -5.101 | Vel:  6.516 m/s | Att: Y= 164.3° P= -25.6° R=-115.4° | Err: 11.4423 m
+[PHASE 1] Reached height: 5
+[ 10.80s] Phase: HOVER-1      | Pos: N= -8.000 E=-11.626 D=-17.857 | Vel:  7.195 m/s | Att: Y= 174.2° P= -39.3° R= 109.2° | Err: 19.0067 m
+[PHASE 2] Hover complete, moving East
+[ 21.98s] Phase: TRANSLATE-E  | Pos: N=-18.775 E=  9.867 D=-94.490 | Vel: 24.907 m/s | Att: Y= -72.9° P= -26.8° R= 107.5° | Err: 100.9504 m
+[PHASE 3] Reached East: 10
+[ 23.98s] Phase: HOVER-2      | Pos: N=-18.728 E= 64.885 D=-96.261 | Vel: 27.705 m/s | Att: Y=  20.8° P= -51.6° R= -32.9° | Err: 108.0227 m
+[PHASE 4] Hover complete, moving North
+[ 34.56s] Phase: TRANSLATE-N  | Pos: N=  9.973 E=339.312 D=-96.022 | Vel: 30.802 m/s | Att: Y= -14.8° P=  35.8° R=  86.4° | Err: 342.5040 m
+[PHASE 5] Reached North: 10
+[ 44.57s] Phase: HOVER-3      | Pos: N=216.866 E=589.165 D=-73.158 | Vel: 32.091 m/s | Att: Y=  67.7° P=  60.4° R= 122.1° | Err: 618.7518 m
+[PHASE 6] Hover complete, initiating landing
+[ 45.01s] Phase: LANDING      | Pos: N=226.248 E=599.637 D=-72.287 | Vel: 31.954 m/s | Att: Y=-120.0° P= -43.0° R= 126.5° | Err: 631.6229 m
