@@ -17,11 +17,19 @@
 \usepackage{algpseudocode}
 \usepackage{siunitx}
 
+% % ---- IITH logo in top-right corner on all slides ----
+% \addtobeamertemplate{frametitle}{}{%
+%     \begin{textblock*}{0cm}(0.88\textwidth,-0.9cm)
+%         \hfill \includegraphics[width=0.9cm]{iith_logo.png}
+%     \end{textblock*}
+% }
+
+
 \title{Hierarchical Control of \\Cooperative Quadrotor Payload Transport}
 \author{
     A 6-DOF Rigid Body Dynamics Simulation\\ with Geometric Attitude Control \\
     \vspace{0.5cm}
-    \small \textbf{Term Project for ME5780 Control Systems Design} \\
+    \small \textbf{Term Project for Control Systems Design (ME5780)} \\
     \vspace{0.5cm}
     \normalsize
     Arkaprabha Sinha Roy (AI25MTECH12001) \\
@@ -152,30 +160,36 @@ Wind force model:
 
 % Slide 7: Block Diagram
 \begin{frame}{Control Architecture: Block Diagram}
-\begin{center}
-\begin{tikzpicture}[scale=0.85, every node/.style={scale=0.85}]
-% Blocks
-\node[draw, rectangle, minimum width=2.5cm, minimum height=1cm] (traj) at (0,0) {Trajectory\\Generator};
-\node[draw, rectangle, minimum width=2.5cm, minimum height=1cm] (pid) at (4,0) {PID Position\\Controller};
-\node[draw, rectangle, minimum width=2.5cm, minimum height=1cm] (geom) at (8,0) {Geometric\\Attitude Control};
-\node[draw, rectangle, minimum width=2.5cm, minimum height=1cm] (alloc) at (8,-2.5) {Thrust\\Allocation};
-\node[draw, rectangle, minimum width=2.5cm, minimum height=1cm] (plant) at (4,-2.5) {Payload +\\Drones};
+\begin{columns}[c]
 
-% Arrows
-\draw[->, thick] (traj) -- node[above] {$\mathbf{x}_d, \mathbf{v}_d, \mathbf{a}_d$} (pid);
-\draw[->, thick] (pid) -- node[above] {$\mathbf{F}_d$} (geom);
-\draw[->, thick] (geom) -- node[right] {$\boldsymbol{\tau}_d$} (alloc);
-\draw[->, thick] (alloc) -- node[below] {$\{\mathbf{T}_i\}$} (plant);
-\draw[->, thick] (plant) -- ++(-2,0) |- node[left, pos=0.75] {$\mathbf{x}, \mathbf{v}, \mathbf{R}, \boldsymbol{\omega}$} (pid);
-\draw[->, thick] (plant) -- ++(2,0) |- (geom);
-\end{tikzpicture}
-\end{center}
+  % Left column: text
+  \begin{column}{0.48\textwidth}
+    \textbf{Hierarchical Structure}
+    \vspace{6pt}
+    \begin{itemize}
+      \item \textbf{Outer loop:} Position control (PID)
+      \item \textbf{Inner loop:} Attitude control (Geometric control on $SO(3)$)
+    \end{itemize}
+  \end{column}
 
-\textbf{Hierarchical Structure:}
-\begin{itemize}
-    \item Outer loop: Position control (PID)
-    \item Inner loop: Attitude control (Geometric on SO(3))
-\end{itemize}
+  % Right column: image (with fallback)
+  \begin{column}{0.52\textwidth}
+    \centering
+    % If the image file exists, include it; otherwise show a placeholder box
+    \IfFileExists{diagram-4x.png}{%
+      \includegraphics[width=\linewidth,keepaspectratio]{diagram-4x.png}%
+    }{%
+      \fbox{%
+        \parbox[c][0.45\textwidth][c]{0.9\linewidth}{%
+          \centering
+          \textbf{diagram-4x.png not found}\\
+          Upload the image to your Overleaf project or change the filename.
+        }%
+      }%
+    }
+  \end{column}
+
+\end{columns}
 \end{frame}
 
 % Slide 8: Position Control
@@ -265,6 +279,31 @@ Feedforward acceleration from trajectory:
 \[
 \mathbf{a}_d(t) = \ddot{\mathbf{x}}_d(t) = [12a_4 t^2 + 6a_3 t + 2a_2]
 \]
+\end{frame}
+
+% Slide 22: Implementation Details
+\begin{frame}{Implementation Details}
+\textbf{Numerical Integration on SO(3)}
+
+Rodrigues formula (exponential map):
+\[
+\mathbf{R}_{k+1} = \mathbf{R}_k \exp(\widehat{\boldsymbol{\omega}}_k \Delta t)
+\]
+
+Exponential of skew-symmetric matrix:
+\[
+\exp(\widehat{\boldsymbol{\omega}} \theta) = \mathbf{I} + \frac{\sin\theta}{\theta}\widehat{\boldsymbol{\omega}} + \frac{1-\cos\theta}{\theta^2}\widehat{\boldsymbol{\omega}}^2
+\]
+where $\theta = \|\boldsymbol{\omega}\| \Delta t$
+
+\textbf{Advantages:}
+\begin{itemize}
+    \item Preserves $\mathbf{R} \in \text{SO}(3)$ (no drift, $\det(\mathbf{R})=1$, $\mathbf{R}^T\mathbf{R}=\mathbf{I}$)
+    \item Singularity-free (no Euler angles)
+    \item Second-order accurate
+\end{itemize}
+
+Translational: Semi-implicit Euler, $\Delta t = \SI{0.01}{s}$
 \end{frame}
 
 % Slide 12: Parameters
@@ -479,31 +518,6 @@ $K_{d,z}$ & $0.042 T_{\max}$ \\
 \end{itemize}
 \end{frame}
 
-% Slide 22: Implementation Details
-\begin{frame}{Implementation Details}
-\textbf{Numerical Integration on SO(3)}
-
-Rodrigues formula (exponential map):
-\[
-\mathbf{R}_{k+1} = \mathbf{R}_k \exp(\widehat{\boldsymbol{\omega}}_k \Delta t)
-\]
-
-Exponential of skew-symmetric matrix:
-\[
-\exp(\widehat{\boldsymbol{\omega}} \theta) = \mathbf{I} + \frac{\sin\theta}{\theta}\widehat{\boldsymbol{\omega}} + \frac{1-\cos\theta}{\theta^2}\widehat{\boldsymbol{\omega}}^2
-\]
-where $\theta = \|\boldsymbol{\omega}\| \Delta t$
-
-\textbf{Advantages:}
-\begin{itemize}
-    \item Preserves $\mathbf{R} \in \text{SO}(3)$ (no drift, $\det(\mathbf{R})=1$, $\mathbf{R}^T\mathbf{R}=\mathbf{I}$)
-    \item Singularity-free (no Euler angles)
-    \item Second-order accurate
-\end{itemize}
-
-Translational: Semi-implicit Euler, $\Delta t = \SI{0.01}{s}$
-\end{frame}
-
 % Slide 23: Conclusion
 \begin{frame}{Conclusion}
 \textbf{Summary of Achievements}
@@ -555,12 +569,8 @@ J. G. Ziegler and N. B. Nichols,
 \Huge Thank You!
 
 \vspace{1.5cm}
-\Large Questions?
-
-\vspace{1.5cm}
 \normalsize
-Contact: [Your Email]\\
-Code: [Repository URL]
+Code: https://github.com/ificiana/csd
 \end{center}
 \end{frame}
 
