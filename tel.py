@@ -27,7 +27,14 @@ class MMapJSON:
             file: If True uses file-backed mmap, else Windows shared memory. Default is False.
         """
         self.file_mode = file
-        self.size = size
+        self.size = size if not file else 4194304
+        self.path = None
+
+        # if os.name != "nt", force file mode since shared memory is Windows-specific
+        # use /dev/shm/ for file mode on Unix for better performance and automatic cleanup
+        if os.name != "nt":
+            self.file_mode = True
+            self.path = os.path.join("/dev/shm/", os.path.basename(path_or_topic))
 
         if self.file_mode:
             self.path = path_or_topic
