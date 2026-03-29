@@ -9,7 +9,6 @@ shared memory regions.
 import json
 import mmap
 import os
-from io import BufferedRandom
 
 from config import MMAP_SIZE
 

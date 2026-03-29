@@ -220,3 +220,6 @@ channel/
 data/
 viz/*.ipynb
 prof
+
+# VS Code settings
+.vscode/
