@@ -221,7 +221,7 @@ def print_initialization():
     print("PAYLOAD CONFIGURATION:")
     print(f"  Mass:            {payload.mass:.2f} kg")
     print(f"  Size:            {payload.size:.2f} m")
-    print(f"  Moment of Inertia: {payload.moi[0,0]:.4f} kg·m²")
+    print(f"  Moment of Inertia: {payload.moi[0, 0]:.4f} kg·m²")
     print()
     print("DRONE CONFIGURATION:")
     for i, d in enumerate(drones):
@@ -234,10 +234,10 @@ def print_initialization():
     print(f"  Total Mass:      {controller.mass:.2f} kg")
     print(f"  Max Thrust:      {drones[0].max_thrust * 4:.1f} N")
     print(
-        f"  Max Takeoff:     {controller.max_takeoff:.1f} N ({MAX_TAKEOFF_FRACTION*100:.0f}%)"
+        f"  Max Takeoff:     {controller.max_takeoff:.1f} N ({MAX_TAKEOFF_FRACTION * 100:.0f}%)"
     )
     print(
-        f"  Max Translation: {controller.max_transl:.1f} N ({MAX_TRANSL_FRACTION*100:.0f}%)"
+        f"  Max Translation: {controller.max_transl:.1f} N ({MAX_TRANSL_FRACTION * 100:.0f}%)"
     )
     print(f"  Max Control:     {controller.max_control:.1f} N")
     print()
@@ -272,7 +272,7 @@ def print_initialization():
         #     f"  Baseline Wind:          [{WIND_BASELINE[0]:.2f}, {WIND_BASELINE[1]:.2f}, {WIND_BASELINE[2]:.2f}] m/s"
         # )
         print(
-            f"  Baseline Wind:          [{WIND_BASELINE[0]*1.94384:.2f}, {WIND_BASELINE[1]*1.94384:.2f}, {WIND_BASELINE[2]*1.94384:.2f}] knots"
+            f"  Baseline Wind:          [{WIND_BASELINE[0] * 1.94384:.2f}, {WIND_BASELINE[1] * 1.94384:.2f}, {WIND_BASELINE[2] * 1.94384:.2f}] knots"
         )
         print(f"  Gust Intensity (sigma): {WIND_GUST_SIGMA:.2f} ms^-0.5")
         print(f"  Drag Coefficient:       {WIND_DRAG_COEFF:.2f}")
