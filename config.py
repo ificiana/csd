@@ -14,17 +14,17 @@ import numpy as np
 # Enable/disable various simulation features for testing and debugging
 
 # Noise switches
-ENABLE_DRONE_MASS_VARIANCE = True  # Add random variance to drone masses
-ENABLE_DRONE_THRUST_NOISE = True  # Add noise to drone thrust outputs
-ENABLE_ATTACHMENT_ERROR = True  # Add error to attachment point positions
-ENABLE_WIND = True  # Enable wind disturbances
+ENABLE_DRONE_MASS_VARIANCE = False  # Add random variance to drone masses
+ENABLE_DRONE_THRUST_NOISE = False  # Add noise to drone thrust outputs
+ENABLE_ATTACHMENT_ERROR = False  # Add error to attachment point positions
+ENABLE_WIND = False  # Enable wind disturbances
 
 # Controller switches
 ENABLE_ATTITUDE_CONTROLLER = True  # Enable geometric attitude control
 ENABLE_POSITION_CONTROLLER = True  # Enable PID position control
 
 # Profiling
-ENABLE_PROFILING = True  # Enable cProfile performance profiling
+ENABLE_PROFILING = False  # Enable cProfile performance profiling
 
 # ============================================================================
 # SIMULATION TIMING

@@ -630,26 +630,26 @@ def plot_graphs(data: Data, bw: bool = False):
         data: Data instance containing all telemetry.
         bw: If True, use black & white print-friendly styling.
     """
-    for i, drone in enumerate(data.drones):
-        plot_drone(drone, i, bw=bw)
+    # for i, drone in enumerate(data.drones):
+    #     plot_drone(drone, i, bw=bw)
 
     cube_plots = [
         (["x", "y", "z"], "Cube COM position", False, "Position (m)"),
         (["x", "y", "z"], "Cube COM position", True, "Position (m)"),
-        (["vx", "vy", "vz"], "Cube velocity", False, "Velocity (m/s)"),
-        (["ax", "ay", "az"], "Cube acceleration", False, "Acceleration (m/s²)"),
-        (
-            ["Wx", "Wy", "Wz"],
-            "Cube angular velocity",
-            False,
-            "Angular velocity (rad/s)",
-        ),
-        (
-            ["Ax", "Ay", "Az"],
-            "Cube angular acceleration",
-            False,
-            "Angular acceleration (rad/s²)",
-        ),
+        # (["vx", "vy", "vz"], "Cube velocity", False, "Velocity (m/s)"),
+        # (["ax", "ay", "az"], "Cube acceleration", False, "Acceleration (m/s²)"),
+        # (
+        #     ["Wx", "Wy", "Wz"],
+        #     "Cube angular velocity",
+        #     False,
+        #     "Angular velocity (rad/s)",
+        # ),
+        # (
+        #     ["Ax", "Ay", "Az"],
+        #     "Cube angular acceleration",
+        #     False,
+        #     "Angular acceleration (rad/s²)",
+        # ),
         (["yaw", "pitch", "roll"], "Yaw/Pitch/Roll", False, "Angle (deg)"),
         (["windx", "windy", "windz"], "Wind velocity", False, "Velocity (m/s)"),
     ]
