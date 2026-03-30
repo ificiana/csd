@@ -20,8 +20,8 @@ ENABLE_ATTACHMENT_ERROR = True  # Add error to attachment point positions
 ENABLE_WIND = True  # Enable wind disturbances
 
 # Controller switches
-ENABLE_ATTITUDE_CONTROLLER = False  # Enable geometric attitude control
-ENABLE_POSITION_CONTROLLER = False  # Enable PID position control
+ENABLE_ATTITUDE_CONTROLLER = True  # Enable geometric attitude control
+ENABLE_POSITION_CONTROLLER = True  # Enable PID position control
 
 # Profiling
 ENABLE_PROFILING = False  # Enable cProfile performance profiling
